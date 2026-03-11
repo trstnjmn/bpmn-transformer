@@ -13,6 +13,12 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "fast-xml-parser": "^5.5.2"
+    "@types/bpmn-moddle": "^10.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "bpmn-moddle": "^10.0.0",
+    "fast-xml-parser": "^5.5.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   }
 }
