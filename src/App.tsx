@@ -153,6 +153,16 @@ const App: React.FC = () => {
               Upload {mode === 'json-to-xml' ? '.json' : '.xml'}
               <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept={mode === 'json-to-xml' ? '.json' : '.xml,.bpmn'} />
             </label>
+            <button
+              className="secondary reset-btn"
+              onClick={() => { setInputText(''); setOutputText(''); setError(''); }}
+              style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              Reset
+            </button>
           </div>
         </div>
 

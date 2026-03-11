@@ -9,21 +9,23 @@
 }
 
 body {
-  margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg-gradient);
   color: var(--text-main);
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Start from top for better scrolling */
+  align-items: flex-start;
+  /* Start from top for better scrolling */
   overflow-x: hidden;
-  padding: 2rem 0;
+  padding: 2rem;
 }
 
 .container {
-  width: 96%; /* Use 96% of screen width */
-  max-width: 1800px; /* Allow it to grow much larger */
+  width: 96%;
+  /* Use 96% of screen width */
+  max-width: 1800px;
+  /* Allow it to grow much larger */
   padding: 2.5rem;
   background: var(--card-bg);
   backdrop-filter: blur(12px);
@@ -34,8 +36,15 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 h1 {
@@ -66,7 +75,8 @@ p.subtitle {
   }
 }
 
-.editor-section, .output-section {
+.editor-section,
+.output-section {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -82,7 +92,8 @@ label {
 
 textarea {
   width: 100%;
-  height: calc(100vh - 400px); /* Dynamic height based on viewport */
+  height: calc(100vh - 400px);
+  /* Dynamic height based on viewport */
   min-height: 450px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
@@ -91,11 +102,14 @@ textarea {
   color: #a5f3fc;
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 0.95rem;
-  resize: vertical; /* Allow manual resizing */
+  resize: vertical;
+  /* Allow manual resizing */
   transition: border-color 0.2s;
   line-height: 1.5;
-  white-space: pre; /* Keep code formatting but allows horizontal scroll */
-  overflow: auto; /* Ensure scrollbars appear only when needed */
+  white-space: pre;
+  /* Keep code formatting but allows horizontal scroll */
+  overflow: auto;
+  /* Ensure scrollbars appear only when needed */
 }
 
 textarea:focus {
@@ -147,7 +161,8 @@ button:disabled {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  height: calc(100vh - 400px); /* Match textarea height */
+  height: calc(100vh - 400px);
+  /* Match textarea height */
   min-height: 450px;
   overflow: auto;
   padding: 1rem;
@@ -159,7 +174,8 @@ pre {
   color: #fca5a5;
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 0.9rem;
-  white-space: pre; /* Use pre to keep formatting, scroll horizontally if needed */
+  white-space: pre;
+  /* Use pre to keep formatting, scroll horizontally if needed */
   word-wrap: normal;
   overflow-wrap: normal;
 }
@@ -175,6 +191,7 @@ pre {
   background: rgba(16, 185, 129, 0.2);
   color: #34d399;
 }
+
 .header-actions {
   display: flex;
   justify-content: space-between;

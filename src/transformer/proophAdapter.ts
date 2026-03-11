@@ -49,20 +49,17 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       metadataMap.set(id, attrs);
     }
 
-    // Handle mxCell
     if (obj.mxCell) {
       const cells = Array.isArray(obj.mxCell) ? obj.mxCell : [obj.mxCell];
       cells.forEach((cell: any) => {
-        // If the cell doesn't have an ID but the parent object does, inherit it
         const cellAttrs = getAttrs(cell);
         if (!cellAttrs.id && id) {
-          cell['@_id'] = id; // Inject ID into cell for later processing
+          cell['@_id'] = id; 
         }
         allCells.push(cell);
       });
     }
 
-    // Recursive search
     Object.keys(obj).forEach(key => {
       if (key !== 'mxCell' && !key.startsWith('@')) {
         const val = obj[key];
@@ -77,7 +74,41 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
 
   processObject(root);
 
-  // 2. Map Cells to BPMN
+  // 2. Pre-calculate absolute positions
+  const cellMap = new Map<string, { attr: any, geometry: any, cell: any }>();
+  allCells.forEach(cell => {
+    const attr = getAttrs(cell);
+    if (attr.id) {
+      cellMap.set(attr.id, {
+        attr,
+        geometry: cell.mxGeometry ? getAttrs(cell.mxGeometry) : null,
+        cell
+      });
+    }
+  });
+
+  const getAbsolutePos = (id: string): { x: number, y: number } => {
+    const entry = cellMap.get(id);
+    if (!entry || !entry.geometry) return { x: 0, y: 0 };
+    
+    let x = parseInt(entry.geometry.x || '0');
+    let y = parseInt(entry.geometry.y || '0');
+    
+    // Offset for labels/points if it's an edge, skip for now to avoid confusion
+    if (entry.attr.edge === '1') return { x: 0, y: 0 };
+
+    if (entry.attr.parent && entry.attr.parent !== '0' && entry.attr.parent !== '1') {
+      const parentPos = getAbsolutePos(entry.attr.parent);
+      x += parentPos.x;
+      y += parentPos.y;
+    }
+    
+    return { x, y };
+  };
+
+  // 3. Map Cells to BPMN
+  const usedPositions = new Set<string>();
+
   allCells.forEach((cell: any) => {
     const attr = getAttrs(cell);
     const id = attr.id;
@@ -87,11 +118,9 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
 
     if (!id || id === '0' || id === '1') return;
 
-    // Handle Vertices (Nodes)
     if (attr.vertex === '1' || attr.vertex === 1) {
       let type: any = 'bpmn:Task'; 
       let name = meta?.label || attr.value || '';
-
       name = name.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim();
 
       if (style.includes('event')) {
@@ -104,26 +133,37 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
         return; 
       }
 
-      elements.push({
-        id: id,
-        type: type,
-        name: name || id
-      });
+      let { x, y } = getAbsolutePos(id);
+      let width = parseInt(geometry?.width || '100');
+      let height = parseInt(geometry?.height || '80');
 
-      if (geometry) {
-        layout.push({
-          id: id + '_di',
-          type: 'shape',
-          bpmnElement: id,
-          x: parseInt(geometry.x || '0'),
-          y: parseInt(geometry.y || '0'),
-          width: parseInt(geometry.width || '100'),
-          height: parseInt(geometry.height || '80')
-        });
+      // Adjust sizes for BPMN standards if they seem generic
+      if (type === 'bpmn:IntermediateCatchEvent') {
+        width = 36;
+        height = 36;
       }
+
+      // Simple overlap prevention: if exact position used, shift it
+      let posKey = `${x},${y}`;
+      let safetyCounter = 0;
+      while (usedPositions.has(posKey) && safetyCounter < 10) {
+        x += 20;
+        y += 20;
+        posKey = `${x},${y}`;
+        safetyCounter++;
+      }
+      usedPositions.add(posKey);
+
+      elements.push({ id, type, name: name || id });
+
+      layout.push({
+        id: id + '_di',
+        type: 'shape',
+        bpmnElement: id,
+        x, y, width, height
+      });
     }
 
-    // Handle Edges (Flows)
     if ((attr.edge === '1' || attr.edge === 1) && attr.source && attr.target) {
       elements.push({
         id: id,
@@ -133,16 +173,17 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       });
 
       const waypoints: { x: number, y: number }[] = [];
-      const geoArray = cell.mxGeometry?.Array || cell.mxGeometry?.points; // Handle different point structures
+      const parentPos = attr.parent ? getAbsolutePos(attr.parent) : { x: 0, y: 0 };
       
+      const geoArray = cell.mxGeometry?.Array || cell.mxGeometry?.points;
       if (geoArray?.mxPoint) {
         const points = Array.isArray(geoArray.mxPoint) ? geoArray.mxPoint : [geoArray.mxPoint];
         points.forEach((p: any) => {
           const pAttr = getAttrs(p);
           if (pAttr.x !== undefined && pAttr.y !== undefined) {
             waypoints.push({
-              x: parseInt(pAttr.x),
-              y: parseInt(pAttr.y)
+              x: parseInt(pAttr.x) + parentPos.x,
+              y: parseInt(pAttr.y) + parentPos.y
             });
           }
         });
