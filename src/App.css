@@ -16,14 +16,15 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* Start from top for better scrolling */
   overflow-x: hidden;
+  padding: 2rem 0;
 }
 
 .container {
-  width: 90%;
-  max-width: 1200px;
-  padding: 2rem;
+  width: 96%; /* Use 96% of screen width */
+  max-width: 1800px; /* Allow it to grow much larger */
+  padding: 2.5rem;
   background: var(--card-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
@@ -81,16 +82,20 @@ label {
 
 textarea {
   width: 100%;
-  height: 400px;
+  height: calc(100vh - 400px); /* Dynamic height based on viewport */
+  min-height: 450px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 1rem;
   color: #a5f3fc;
   font-family: 'Fira Code', 'Courier New', monospace;
-  font-size: 0.9rem;
-  resize: none;
+  font-size: 0.95rem;
+  resize: vertical; /* Allow manual resizing */
   transition: border-color 0.2s;
+  line-height: 1.5;
+  white-space: pre; /* Keep code formatting but allows horizontal scroll */
+  overflow: auto; /* Ensure scrollbars appear only when needed */
 }
 
 textarea:focus {
@@ -142,7 +147,8 @@ button:disabled {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  height: 400px;
+  height: calc(100vh - 400px); /* Match textarea height */
+  min-height: 450px;
   overflow: auto;
   padding: 1rem;
   position: relative;
@@ -152,8 +158,10 @@ pre {
   margin: 0;
   color: #fca5a5;
   font-family: 'Fira Code', 'Courier New', monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
+  font-size: 0.9rem;
+  white-space: pre; /* Use pre to keep formatting, scroll horizontally if needed */
+  word-wrap: normal;
+  overflow-wrap: normal;
 }
 
 .status {

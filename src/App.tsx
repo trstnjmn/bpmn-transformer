@@ -3,35 +3,8 @@ import './App.css';
 import { convertToBpmnXml, convertFromBpmnXml, mapProophToConversionInput } from './transformer';
 import type { ConversionInput } from './transformer';
 
-const DEFAULT_JSON: ConversionInput = {
-  process: {
-    id: 'OrderProcess_1',
-    name: 'Order Fulfillment Process',
-    elements: [
-      { id: 'start_1', type: 'bpmn:StartEvent', name: 'Order Received' },
-      { id: 'task_1', type: 'bpmn:UserTask', name: 'Review Order' },
-      { id: 'gateway_1', type: 'bpmn:ExclusiveGateway', name: 'Approved?' },
-      { id: 'task_2', type: 'bpmn:ServiceTask', name: 'Ship Items' },
-      { id: 'end_1', type: 'bpmn:EndEvent', name: 'Order Completed' },
-      { id: 'flow_1', type: 'bpmn:SequenceFlow', sourceRef: 'start_1', targetRef: 'task_1' },
-      { id: 'flow_2', type: 'bpmn:SequenceFlow', sourceRef: 'task_1', targetRef: 'gateway_1' },
-      { id: 'flow_3', type: 'bpmn:SequenceFlow', sourceRef: 'gateway_1', targetRef: 'task_2', name: 'Yes' },
-      { id: 'flow_4', type: 'bpmn:SequenceFlow', sourceRef: 'task_2', targetRef: 'end_1' }
-    ]
-  },
-  layout: [
-    { id: 'start_1_di', type: 'shape', bpmnElement: 'start_1', x: 100, y: 100, width: 36, height: 36 },
-    { id: 'task_1_di', type: 'shape', bpmnElement: 'task_1', x: 200, y: 78, width: 100, height: 80 },
-    { id: 'gateway_1_di', type: 'shape', bpmnElement: 'gateway_1', x: 350, y: 93, width: 50, height: 50 },
-    { id: 'task_2_di', type: 'shape', bpmnElement: 'task_2', x: 450, y: 78, width: 100, height: 80 },
-    { id: 'end_1_di', type: 'shape', bpmnElement: 'end_1', x: 600, y: 100, width: 36, height: 36 },
-    { id: 'flow_1_di', type: 'edge', bpmnElement: 'flow_1', waypoints: [{ x: 136, y: 118 }, { x: 200, y: 118 }] },
-    { id: 'flow_2_di', type: 'edge', bpmnElement: 'flow_2', waypoints: [{ x: 300, y: 118 }, { x: 350, y: 118 }] }
-  ]
-};
-
 const App: React.FC = () => {
-  const [mode, setMode] = useState<'xml-to-json' | 'json-to-xml' | 'xml-to-bpmn'>('xml-to-json');
+  const [mode, setMode] = useState<'xml-to-bpmn' | 'json-to-xml' | 'xml-to-json'>('xml-to-bpmn');
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -58,17 +31,17 @@ const App: React.FC = () => {
         } else {
           finalInput = parsedInput as ConversionInput;
         }
-        
+
         const xml = await convertToBpmnXml(finalInput);
         setOutputText(xml);
       } else if (mode === 'xml-to-bpmn') {
         // 1. Raw XML to Generic JSON
         const jsonObj = await convertFromBpmnXml(inputText);
-        
+
         // 2. Map Prooph (mxGraph) JSON to our internal BPMN format
         // This will throw if the XML isn't a valid Prooph board XML
         const finalInput = mapProophToConversionInput(jsonObj);
-        
+
         // 3. Convert our internal format to BPMN XML
         const finalXml = await convertToBpmnXml(finalInput);
         setOutputText(finalXml);
@@ -129,25 +102,26 @@ const App: React.FC = () => {
           </p>
         </div>
         <div className="toggle-group">
-          <button 
-            className={`toggle-btn ${mode === 'xml-to-json' ? 'active' : ''}`}
-            onClick={() => { setMode('xml-to-json'); setInputText(''); setOutputText(''); setError(''); }}
-          >
-            XML ➔ JSON
-          </button>
-          <button 
-            className={`toggle-btn ${mode === 'json-to-xml' ? 'active' : ''}`}
-            onClick={() => { setMode('json-to-xml'); setInputText(''); setOutputText(''); setError(''); }}
-          >
-            JSON ➔ XML (BPMN)
-          </button>
-          <button 
+          <button
             className={`toggle-btn ${mode === 'xml-to-bpmn' ? 'active' : ''}`}
             onClick={() => { setMode('xml-to-bpmn'); setInputText(''); setOutputText(''); setError(''); }}
             style={{ fontWeight: 'bold', color: '#60a5fa' }}
           >
             XML ➔ BPMN XML (Full)
           </button>
+          <button
+            className={`toggle-btn ${mode === 'xml-to-json' ? 'active' : ''}`}
+            onClick={() => { setMode('xml-to-json'); setInputText(''); setOutputText(''); setError(''); }}
+          >
+            XML ➔ JSON
+          </button>
+          <button
+            className={`toggle-btn ${mode === 'json-to-xml' ? 'active' : ''}`}
+            onClick={() => { setMode('json-to-xml'); setInputText(''); setOutputText(''); setError(''); }}
+          >
+            JSON ➔ XML (BPMN)
+          </button>
+
         </div>
       </div>
 
@@ -162,19 +136,19 @@ const App: React.FC = () => {
             placeholder={mode === 'xml-to-json' || mode === 'xml-to-bpmn' ? 'Paste XML here...' : 'Paste JSON process definition here...'}
           />
           <div className="actions">
-            <button 
-              className="primary" 
-              onClick={handleTransform} 
+            <button
+              className="primary"
+              onClick={handleTransform}
               disabled={isProcessing || !inputText}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>
+                <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z" /><path d="M17 21v-8H7v8" /><path d="M7 3v5h8" />
               </svg>
               {isProcessing ? 'Processing...' : 'Run Transformation'}
             </button>
             <label className="button upload-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 0, padding: '0.8rem 1.5rem', borderRadius: '12px' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               Upload {mode === 'json-to-xml' ? '.json' : '.xml'}
               <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept={mode === 'json-to-xml' ? '.json' : '.xml,.bpmn'} />
@@ -193,25 +167,25 @@ const App: React.FC = () => {
             {outputText && !error && <div className="status">SUCCESS</div>}
           </div>
           <div className="actions">
-            <button 
-              className="secondary" 
-              onClick={handleCopy} 
+            <button
+              className="secondary"
+              onClick={handleCopy}
               disabled={!outputText || !!error}
               style={{ background: copied ? '#10b981' : 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.1)' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
               {copied ? 'Copied!' : 'Copy to Clipboard'}
             </button>
-            <button 
-              className="primary" 
-              onClick={handleDownload} 
+            <button
+              className="primary"
+              onClick={handleDownload}
               disabled={!outputText || !!error}
               style={{ background: '#3b82f6' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
               </svg>
               Download Result
             </button>
