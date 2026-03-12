@@ -122,7 +122,14 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
 
     if (attr.vertex === '1' || attr.vertex === 1) {
       let type: any = 'bpmn:Task'; 
-      let { role, cleanName } = extractRoleAndCleanName(meta?.label || attr.value || '');
+      let rawLabel = meta?.label || attr.value || '';
+      // Strip HTML tags and normalize spacing
+      rawLabel = rawLabel.replace(/<br\s*\/?>/gi, '\n'); 
+      rawLabel = rawLabel.replace(/<[^>]*>/g, ' '); 
+      rawLabel = rawLabel.replace(/&nbsp;/g, ' ');
+      rawLabel = rawLabel.replace(/[ \t]+/g, ' ').trim();
+
+      let { role, cleanName } = extractRoleAndCleanName(rawLabel);
 
       if (style.includes('event')) {
         type = 'bpmn:IntermediateCatchEvent';
