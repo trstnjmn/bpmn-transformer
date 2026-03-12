@@ -129,7 +129,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
         type = 'bpmn:UserTask';
       } else if (style.includes('policy')) {
         type = 'bpmn:BusinessRuleTask';
-      } else if (style.includes('boundedContext') || style.includes('feature') || style.includes('freeText') || style.includes('icon')) {
+      } else if (style.includes('boundedContext') || style.includes('feature') || style.includes('freeText') || style.includes('icon') || style.includes('image')) {
         return; 
       }
 
