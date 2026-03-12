@@ -1,5 +1,5 @@
 import ELK from 'elkjs/lib/elk.bundled.js';
-import type { ProcessElement, DiagramLayout } from './types';
+import type { ProcessElement, DiagramLayout, LaneDefinition } from './types';
 import { getRoleRank } from './roleService';
 
 const elk = new ELK();
@@ -102,7 +102,7 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
  * automatic layout using the ELK layout engine.
  * Returns a new DiagramLayout[] with absolute x/y positions.
  */
-export async function computeElkLayout(elements: ProcessElement[]): Promise<{
+export async function computeElkLayout(elements: ProcessElement[], lanes?: LaneDefinition[]): Promise<{
   layout: DiagramLayout[];
   validEdgeIds: Set<string>;
 }> {
@@ -135,12 +135,13 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.spacing.nodeNode': '60',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+      'elk.spacing.nodeNode': '100',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '100',
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.partitioning': 'true',
+      'elk.partitioning.spacing': '100',
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
@@ -170,7 +171,7 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
     const sizeInfo = getElementSize(node?.type ?? '', node?.name);
     const colors = node ? ELEMENT_COLORS[node.type] : undefined;
 
-    const shapeX = Math.round((child.x ?? 0) + (child.width! - sizeInfo.shapeWidth) / 2);
+    const shapeX = Math.round((child.x ?? 0) + (child.width! - sizeInfo.shapeWidth) / 2) + 50; // Add 50 for lane headers
     const shapeY = Math.round(child.y ?? 0);
 
     const layoutItem: DiagramLayout = {
@@ -187,7 +188,7 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
 
     if (sizeInfo.label) {
       layoutItem.label = {
-        x: Math.round((child.x ?? 0) + (child.width! - sizeInfo.label.width) / 2),
+        x: Math.round((child.x ?? 0) + (child.width! - sizeInfo.label.width) / 2) + 50,
         y: Math.round(shapeY + sizeInfo.shapeHeight + 5),
         width: sizeInfo.label.width,
         height: sizeInfo.label.height,
@@ -204,11 +205,11 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
     const waypoints: { x: number; y: number }[] = [];
 
     for (const section of sections) {
-      if (section.startPoint) waypoints.push({ x: Math.round(section.startPoint.x), y: Math.round(section.startPoint.y) });
+      if (section.startPoint) waypoints.push({ x: Math.round(section.startPoint.x + 50), y: Math.round(section.startPoint.y) });
       for (const bp of section.bendPoints ?? []) {
-        waypoints.push({ x: Math.round(bp.x), y: Math.round(bp.y) });
+        waypoints.push({ x: Math.round(bp.x + 50), y: Math.round(bp.y) });
       }
-      if (section.endPoint) waypoints.push({ x: Math.round(section.endPoint.x), y: Math.round(section.endPoint.y) });
+      if (section.endPoint) waypoints.push({ x: Math.round(section.endPoint.x + 50), y: Math.round(section.endPoint.y) });
     }
 
     layout.push({
@@ -216,6 +217,52 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
       type: 'edge',
       bpmnElement: edge.id,
       waypoints: waypoints.length > 0 ? waypoints : undefined,
+    });
+  }
+
+  // Calculate Lane Layouts if provided
+  if (lanes && lanes.length > 0) {
+    const laneMap = new Map<string, LaneDefinition>();
+    lanes.forEach(l => laneMap.set(l.id, l));
+
+    // Find the total diagram width
+    let maxEndX = 0;
+    layout.forEach(item => {
+      if (item.type === 'shape' && item.x !== undefined && item.width !== undefined) {
+        maxEndX = Math.max(maxEndX, item.x + item.width);
+      }
+    });
+
+    const diagramWidth = Math.max(800, maxEndX + 200);
+    const lanePadding = 40;
+
+    lanes.forEach(lane => {
+      const laneElements = layout.filter(item => 
+        item.type === 'shape' && lane.elementIds.includes(item.bpmnElement)
+      );
+
+      if (laneElements.length === 0) return;
+
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      laneElements.forEach(item => {
+        minY = Math.min(minY, item.y || 0);
+        maxY = Math.max(maxY, (item.y || 0) + (item.height || 0));
+      });
+
+      const laneY = minY - lanePadding;
+      const laneHeight = Math.max(120, (maxY - minY) + (lanePadding * 2));
+
+      layout.push({
+        id: lane.id + '_di',
+        type: 'shape',
+        bpmnElement: lane.id,
+        x: 0, 
+        y: Math.max(0, laneY),
+        width: diagramWidth + 50,
+        height: laneHeight
+      });
     });
   }
 

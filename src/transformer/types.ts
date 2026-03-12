@@ -13,15 +13,22 @@ export interface ProcessElement {
   id: string;
   type: BPMNElementType;
   name?: string;
-  role?: string; // For role-based sorting
+  role?: string; // For role-based sorting/lanes
   sourceRef?: string; // For sequence flows
   targetRef?: string; // For sequence flows
+}
+
+export interface LaneDefinition {
+  id: string;
+  name: string;
+  elementIds: string[];
 }
 
 export interface ProcessDefinition {
   id: string;
   name?: string;
   elements: ProcessElement[];
+  lanes?: LaneDefinition[];
 }
 
 export interface DiagramLayout {

@@ -43,7 +43,7 @@ const App: React.FC = () => {
         const proophResult = mapProophToConversionInput(jsonObj);
 
         // 3. Auto-layout with ELK — also returns which edges are valid
-        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements);
+        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements, proophResult.process.lanes);
 
         // 4. Remove SequenceFlows that ELK rejected (dangling refs to filtered nodes)
         const cleanedElements = proophResult.process.elements.filter(e =>
@@ -89,14 +89,14 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    
+
     // Use the original filename if available, otherwise fallback to default
     let fileName = isXml ? 'process.bpmn' : 'process.json';
     if (uploadedFileName) {
       const baseName = uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName;
       fileName = `${baseName}.${isXml ? 'bpmn' : 'json'}`;
     }
-    
+
     link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
@@ -117,7 +117,7 @@ const App: React.FC = () => {
     <div className="container">
       <div className="header-actions">
         <div>
-          <h1>XML & BPMN Transformer</h1>
+          <h1>XML to BPMN Converter</h1>
           <p className="subtitle" style={{ marginBottom: 0 }}>
             {mode === 'xml-to-json' && 'Convert any XML to a clean JSON structure.'}
             {mode === 'json-to-xml' && 'Convert JSON process definitions to standard BPMN 2.0 XML.'}

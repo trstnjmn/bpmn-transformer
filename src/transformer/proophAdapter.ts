@@ -1,5 +1,5 @@
-import type { ConversionInput, ProcessElement, DiagramLayout } from './types';
-import { extractRoleAndCleanName } from './roleService';
+import type { ConversionInput, ProcessElement, DiagramLayout, LaneDefinition } from './types';
+import { extractRoleAndCleanName, getRoleRank } from './roleService';
 
 /**
  * Helper to get attributes from an object, handling both '@_prefix' and '@attributes' nesting.
@@ -198,11 +198,40 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
     }
   });
 
+  // 4. Group into Lanes
+  const lanes: LaneDefinition[] = [];
+  const elementsByRole = new Map<string, string[]>();
+
+  elements.forEach(el => {
+    if (el.type !== 'bpmn:SequenceFlow') {
+      const roleName = el.role || 'Unassigned';
+      const list = elementsByRole.get(roleName) || [];
+      list.push(el.id);
+      elementsByRole.set(roleName, list);
+    }
+  });
+
+  // Create lanes ordered by role rank
+  const sortedRoles = Array.from(elementsByRole.keys()).sort((a, b) => {
+    if (a === 'Unassigned') return 1;
+    if (b === 'Unassigned') return -1;
+    return getRoleRank(a) - getRoleRank(b);
+  });
+
+  sortedRoles.forEach(roleName => {
+    lanes.push({
+      id: `Lane_${roleName.replace(/\s+/g, '_')}`,
+      name: roleName,
+      elementIds: elementsByRole.get(roleName) || []
+    });
+  });
+
   return {
     process: {
       id: 'ProophProcess',
       name: 'Imported from Prooph Board',
-      elements: elements
+      elements: elements,
+      lanes: lanes
     },
     layout: layout
   };

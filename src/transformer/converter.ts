@@ -87,6 +87,26 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
   // Add all elements to the process
   process.flowElements = allElements;
 
+  // 4a. Handle Lanes
+  if (processDef.lanes && processDef.lanes.length > 0) {
+    const laneElements = processDef.lanes.map(l => {
+      const lane = moddle.create('bpmn:Lane', {
+        id: sanitizeId(l.id),
+        name: l.name,
+        flowNodeRef: l.elementIds.map(id => flowElementsMap.get(sanitizeId(id))).filter(Boolean)
+      });
+      flowElementsMap.set(lane.id, lane);
+      return lane;
+    });
+
+    const laneSet = moddle.create('bpmn:LaneSet', {
+      id: 'LaneSet_1',
+      lanes: laneElements
+    });
+
+    process.laneSets = [laneSet];
+  }
+
   // 5. Handle BPMN Diagram Layout (BPMNDI)
   if (layout && layout.length > 0) {
     const planeElements: any[] = [];
@@ -128,6 +148,12 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
         }
 
         const shape = moddle.create('bpmndi:BPMNShape', shapeParams);
+        
+        // If it's a lane, we can force isHorizontal if needed, though usually inherited from parent diagram
+        if (targetElement.$type === 'bpmn:Lane') {
+          shape.isHorizontal = true;
+        }
+        
         planeElements.push(shape);
       } else if (l.type === 'edge') {
         const waypoints = (l.waypoints || []).map(wp =>
