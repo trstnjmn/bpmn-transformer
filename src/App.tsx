@@ -187,9 +187,9 @@ const App: React.FC = () => {
 
         {/* Main Interface */}
         <main className="space-y-8">
-          <Tabs 
-            defaultValue="xml-to-bpmn" 
-            value={mode} 
+          <Tabs
+            defaultValue="xml-to-bpmn"
+            value={mode}
             onValueChange={(v) => {
               setMode(v as any);
               handleReset();
@@ -199,11 +199,11 @@ const App: React.FC = () => {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <TabsList className="grid grid-cols-3 w-full max-w-md">
-                  <TabsTrigger value="xml-to-bpmn">XML ➔ BPMN</TabsTrigger>
-                  <TabsTrigger value="xml-to-json">XML ➔ JSON</TabsTrigger>
-                  <TabsTrigger value="json-to-xml">JSON ➔ XML</TabsTrigger>
+                  <TabsTrigger value="xml-to-bpmn" className={`${mode === 'xml-to-bpmn' ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : ''}`}>XML ➔ BPMN</TabsTrigger>
+                  <TabsTrigger value="xml-to-json" className={`${mode === 'xml-to-json' ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : ''}`}>XML ➔ JSON</TabsTrigger>
+                  <TabsTrigger value="json-to-xml" className={`${mode === 'json-to-xml' ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : ''}`}>JSON ➔ XML</TabsTrigger>
                 </TabsList>
-                
+
                 <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 italic">
                   <Settings2 className="h-4 w-4" />
                   {mode === 'xml-to-bpmn' && "Auto-layout with ELK engine enabled"}
