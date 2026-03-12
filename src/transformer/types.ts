@@ -13,6 +13,7 @@ export interface ProcessElement {
   id: string;
   type: BPMNElementType;
   name?: string;
+  role?: string; // For role-based sorting
   sourceRef?: string; // For sequence flows
   targetRef?: string; // For sequence flows
 }

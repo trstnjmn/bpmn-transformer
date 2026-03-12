@@ -1,4 +1,5 @@
 import type { ConversionInput, ProcessElement, DiagramLayout } from './types';
+import { extractRoleAndCleanName } from './roleService';
 
 /**
  * Helper to get attributes from an object, handling both '@_prefix' and '@attributes' nesting.
@@ -120,8 +121,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
 
     if (attr.vertex === '1' || attr.vertex === 1) {
       let type: any = 'bpmn:Task'; 
-      let name = meta?.label || attr.value || '';
-      name = name.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim();
+      let { role, cleanName } = extractRoleAndCleanName(meta?.label || attr.value || '');
 
       if (style.includes('event')) {
         type = 'bpmn:IntermediateCatchEvent';
@@ -154,7 +154,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       }
       usedPositions.add(posKey);
 
-      elements.push({ id, type, name: name || id });
+      elements.push({ id, type, name: cleanName || id, role });
 
       layout.push({
         id: id + '_di',

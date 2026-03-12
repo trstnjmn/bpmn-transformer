@@ -1,5 +1,6 @@
 import ELK from 'elkjs/lib/elk.bundled.js';
 import type { ProcessElement, DiagramLayout } from './types';
+import { getRoleRank } from './roleService';
 
 const elk = new ELK();
 
@@ -139,6 +140,7 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.partitioning': 'true',
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
@@ -146,6 +148,9 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
         id: node.id,
         width: size.width,
         height: size.height,
+        layoutOptions: {
+          'elk.partition': String(getRoleRank(node.role)),
+        }
       };
     }),
     edges: edges.map(edge => ({

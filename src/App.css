@@ -12,27 +12,24 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg-gradient);
   color: var(--text-main);
-  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: flex-start;
   /* Start from top for better scrolling */
   overflow-x: hidden;
-  padding: 2rem;
 }
 
 .container {
-  width: 96%;
-  /* Use 96% of screen width */
-  max-width: 1800px;
-  /* Allow it to grow much larger */
-  padding: 2.5rem;
+  max-height: 96vh;
+  padding: 2rem;
+  margin: 1rem;
   background: var(--card-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   border-radius: 24px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   animation: fadeIn 0.8s ease-out;
+  corner-shape: squircle;
 }
 
 @keyframes fadeIn {
