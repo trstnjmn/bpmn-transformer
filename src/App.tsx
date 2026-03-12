@@ -1,7 +1,29 @@
 import React, { useState } from 'react';
-import './App.css';
-import { convertToBpmnXml, convertFromBpmnXml, mapProophToConversionInput, computeElkLayout, beautifyXml } from './transformer';
+import {
+  convertToBpmnXml,
+  convertFromBpmnXml,
+  mapProophToConversionInput,
+  computeElkLayout,
+  beautifyXml
+} from './transformer';
 import type { ConversionInput } from './transformer';
+
+import { Button } from "./components/ui/button";
+import { Textarea } from "./components/ui/textarea";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import {
+  FileCode,
+  Download,
+  Copy,
+  RotateCcw,
+  Upload,
+  Play,
+  AlertCircle,
+  CheckCircle2,
+  Settings2
+} from "lucide-react";
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<'xml-to-bpmn' | 'json-to-xml' | 'xml-to-json'>('xml-to-bpmn');
@@ -118,117 +140,197 @@ const App: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handleReset = () => {
+    setInputText('');
+    setOutputText('');
+    setError('');
+    setUploadedFileName('');
+  };
+
   return (
-    <div className="container">
-      <div className="header-actions">
-        <div>
-          <h1>XML to BPMN Converter</h1>
-          <p className="subtitle" style={{ marginBottom: 0 }}>
-            {mode === 'xml-to-json' && 'Convert any XML to a clean JSON structure.'}
-            {mode === 'json-to-xml' && 'Convert JSON process definitions to standard BPMN 2.0 XML.'}
-            {mode === 'xml-to-bpmn' && 'Directly convert Prooph Board XML to BPMN 2.0 XML.'}
-          </p>
-        </div>
-        <div className="toggle-group">
-          <button
-            className={`toggle-btn ${mode === 'xml-to-bpmn' ? 'active' : ''}`}
-            onClick={() => { setMode('xml-to-bpmn'); setInputText(''); setOutputText(''); setError(''); }}
-            style={{ fontWeight: 'bold', color: '#60a5fa' }}
-          >
-            XML ➔ BPMN XML (Full)
-          </button>
-          <button
-            className={`toggle-btn ${mode === 'xml-to-json' ? 'active' : ''}`}
-            onClick={() => { setMode('xml-to-json'); setInputText(''); setOutputText(''); setError(''); }}
-          >
-            XML ➔ JSON
-          </button>
-          <button
-            className={`toggle-btn ${mode === 'json-to-xml' ? 'active' : ''}`}
-            onClick={() => { setMode('json-to-xml'); setInputText(''); setOutputText(''); setError(''); }}
-          >
-            JSON ➔ XML (BPMN)
-          </button>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 font-sans">
+      <div className="max-w-7xl mx-auto space-y-8">
 
-        </div>
-      </div>
+        {/* Header */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
+              <FileCode className="h-8 w-8 text-blue-600" />
+              BPMN Transformer
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400">
+              Convert between Prooph Board XML, standard BPMN 2.0 and JSON.
+            </p>
+          </div>
 
-      <div className="grid">
-        <div className="editor-section">
-          <label htmlFor="input-text">Input {mode === 'xml-to-json' || mode === 'xml-to-bpmn' ? 'XML' : 'JSON'}</label>
-          <textarea
-            id="input-text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            spellCheck={false}
-            placeholder={mode === 'xml-to-json' || mode === 'xml-to-bpmn' ? 'Paste XML here...' : 'Paste JSON process definition here...'}
-          />
-          <div className="actions">
-            <button
-              className="primary"
-              onClick={handleTransform}
-              disabled={isProcessing || !inputText}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z" /><path d="M17 21v-8H7v8" /><path d="M7 3v5h8" />
-              </svg>
-              {isProcessing ? 'Processing...' : 'Run Transformation'}
-            </button>
-            <label className="button upload-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 0, padding: '0.8rem 1.5rem', borderRadius: '12px' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              Upload {mode === 'json-to-xml' ? '.json' : '.xml'}
-              <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept={mode === 'json-to-xml' ? '.json' : '.xml,.bpmn'} />
-            </label>
-            <button
-              className="secondary reset-btn"
-              onClick={() => { setInputText(''); setOutputText(''); setError(''); setUploadedFileName(''); }}
-              style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              Reset
-            </button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleReset} className="flex gap-2">
+              <RotateCcw className="h-4 w-4" /> Reset
+            </Button>
+            <div className="relative">
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                onChange={handleFileUpload}
+                accept={mode === 'json-to-xml' ? '.json' : '.xml,.bpmn'}
+              />
+              <Button
+                onClick={() => document.getElementById('file-upload')?.click()}
+                className="flex gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <Upload className="h-4 w-4" /> Upload File
+              </Button>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <div className="output-section">
-          <label htmlFor="output-text">Output {mode === 'xml-to-json' ? 'JSON' : 'XML'}</label>
-          <div className="output-container">
-            {error ? (
-              <pre style={{ color: '#ef4444' }}>{error}</pre>
-            ) : (
-              <pre id="output-text">{outputText || 'Result will appear here...'}</pre>
-            )}
-            {outputText && !error && <div className="status">SUCCESS</div>}
-          </div>
-          <div className="actions">
-            <button
-              className="secondary"
-              onClick={handleCopy}
-              disabled={!outputText || !!error}
-              style={{ background: copied ? '#10b981' : 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255,255,255,0.1)' }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-              {copied ? 'Copied!' : 'Copy to Clipboard'}
-            </button>
-            <button
-              className="primary"
-              onClick={handleDownload}
-              disabled={!outputText || !!error}
-              style={{ background: '#3b82f6' }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Download Result
-            </button>
-          </div>
-        </div>
+        {/* Main Interface */}
+        <main className="space-y-6">
+          <Tabs
+            defaultValue="xml-to-bpmn"
+            value={mode}
+            onValueChange={(v) => {
+              setMode(v as any);
+              handleReset();
+            }}
+            className="w-full"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <TabsList className="grid grid-cols-3 w-full max-w-md">
+                <TabsTrigger value="xml-to-bpmn">XML ➔ BPMN</TabsTrigger>
+                <TabsTrigger value="xml-to-json">XML ➔ JSON</TabsTrigger>
+                <TabsTrigger value="json-to-xml">JSON ➔ XML</TabsTrigger>
+              </TabsList>
+
+              <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 italic">
+                <Settings2 className="h-4 w-4" />
+                {mode === 'xml-to-bpmn' && "Auto-layout with ELK engine enabled"}
+                {mode === 'xml-to-json' && "Direct structure mapping"}
+                {mode === 'json-to-xml' && "BPMN 2.0 schema validation"}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Input Section */}
+              <Card className="shadow-md border-slate-200 dark:border-slate-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    Input {mode === 'json-to-xml' ? 'JSON' : 'XML'}
+                    {uploadedFileName && (
+                      <span className="text-xs font-normal text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded">
+                        {uploadedFileName}
+                      </span>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {mode === 'xml-to-bpmn' && "Paste your Prooph Board XML here."}
+                    {mode === 'xml-to-json' && "Paste any XML to see its JSON representation."}
+                    {mode === 'json-to-xml' && "Paste a JSON process definition."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <Textarea
+                      placeholder={mode === 'json-to-xml' ? '{\n  "process": { ... }\n}' : '<mxGraphModel>...</mxGraphModel>'}
+                      className="min-h-[400px] font-mono text-sm resize-none focus-visible:ring-blue-500"
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      spellCheck={false}
+                    />
+                    <Button
+                      className="w-full flex gap-2 h-12 text-md transition-all active:scale-[0.98]"
+                      disabled={isProcessing || !inputText}
+                      onClick={handleTransform}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 fill-current" /> Run Transformation
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Output Section */}
+              <Card className="shadow-md border-slate-200 dark:border-slate-800 flex flex-col">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">
+                    Output {mode === 'xml-to-json' ? 'JSON' : 'XML'}
+                  </CardTitle>
+                  <CardDescription>
+                    Generated result will appear below.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <div className="relative h-[400px] border rounded-md overflow-hidden bg-slate-50 dark:bg-slate-900/50">
+                    {error ? (
+                      <div className="p-4 h-full flex items-center justify-center">
+                        <Alert variant="destructive" className="max-w-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>Error</AlertTitle>
+                          <AlertDescription className="text-xs break-all">
+                            {error}
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    ) : outputText ? (
+                      <pre className="p-4 text-sm font-mono whitespace-pre overflow-auto h-full text-slate-800 dark:text-slate-200">
+                        {outputText}
+                      </pre>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-400 italic text-sm">
+                        Waiting for transformation...
+                      </div>
+                    )}
+
+                    {outputText && !error && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 className="h-3 w-3" /> SUCCESS
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter className="pt-3 border-t flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 flex gap-2"
+                    onClick={handleCopy}
+                    disabled={!outputText || !!error}
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" /> Copy
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="flex-1 flex gap-2 bg-slate-800 dark:bg-slate-200 dark:text-slate-900"
+                    onClick={handleDownload}
+                    disabled={!outputText || !!error}
+                  >
+                    <Download className="h-4 w-4" /> Download
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </Tabs>
+        </main>
+
+        <footer className="text-center text-slate-400 text-xs py-10 border-t">
+          <p>© 2026 BPMN Transformer Tool. Built with React & Tailwind CSS.</p>
+        </footer>
       </div>
     </div>
   );
