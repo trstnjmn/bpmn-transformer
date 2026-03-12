@@ -85,17 +85,12 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
     }
   });
 
-// 4b. Titel-Annotation erstellen
+// 4a. Titel-Annotation erstellen
   if (fileName) {
-    const currentDate = new Date().toLocaleDateString('de-DE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
+    const currentDate = new Date().toLocaleDateString('de-DE');
+    const cleanName = (fileName.substring(0, fileName.lastIndexOf('.')) || fileName).toUpperCase();
 
-    const cleanName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
-
-    const titleText = `${cleanName.toUpperCase()} | ${currentDate}`;
+    const titleText = `${cleanName}\n(Stand: ${currentDate})`;
     const annotationId = sanitizeId(`title_annotation_${processId}`);
 
     const textAnnotation = moddle.create('bpmn:TextAnnotation', {
@@ -107,10 +102,9 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
     flowElementsMap.set(annotationId, textAnnotation);
   }
 
-  // Add all elements to the process
   process.flowElements = allElements;
 
-  // 4a. Handle Lanes
+  // 4b. Handle Lanes
   if (processDef.lanes && processDef.lanes.length > 0) {
     const laneElements = processDef.lanes.map(l => {
       const lane = moddle.create('bpmn:Lane', {
@@ -201,9 +195,9 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
           id: `${annotationId}_di`,
           bpmnElement: textAnnotation,
           bounds: moddle.create('dc:Bounds', {
-            x: 0,  // Feste Position oben links
-            y: 20,  // Feste Position oben
-            width: 400,
+            x: 0,
+            y: 20,
+            width: 600,
             height: 40
           })
         });
