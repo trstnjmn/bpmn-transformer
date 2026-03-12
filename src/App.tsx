@@ -22,8 +22,12 @@ import {
   Play,
   AlertCircle,
   CheckCircle2,
-  Settings2
+  Settings2,
+  Code,
+  Eye
 } from "lucide-react";
+import { BpmnViewer } from './components/BpmnViewer';
+
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<'xml-to-bpmn' | 'json-to-xml' | 'xml-to-json'>('xml-to-bpmn');
@@ -33,6 +37,7 @@ const App: React.FC = () => {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [outputViewMode, setOutputViewMode] = useState<'code' | 'diagram'>('code');
 
   const handleTransform = async () => {
     setIsProcessing(true);
@@ -263,8 +268,28 @@ const App: React.FC = () => {
               {/* Output Section */}
               <Card className="shadow-md border-slate-200 dark:border-slate-800 flex flex-col">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">
-                    Output {mode === 'xml-to-json' ? 'JSON' : 'XML'}
+                  <CardTitle className="text-lg flex justify-between items-center w-full">
+                    <span>Output {mode === 'xml-to-json' ? 'JSON' : 'XML'}</span>
+                    {(mode === 'xml-to-bpmn' || mode === 'json-to-xml') && (
+                      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-md p-1">
+                        <Button
+                          variant={outputViewMode === 'code' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setOutputViewMode('code')}
+                        >
+                          <Code className="h-3 w-3 mr-1" /> Code
+                        </Button>
+                        <Button
+                          variant={outputViewMode === 'diagram' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setOutputViewMode('diagram')}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> Diagram
+                        </Button>
+                      </div>
+                    )}
                   </CardTitle>
                   <CardDescription>
                     Generated result will appear below.
@@ -283,9 +308,20 @@ const App: React.FC = () => {
                         </Alert>
                       </div>
                     ) : outputText ? (
-                      <pre className="p-4 text-sm font-mono whitespace-pre overflow-auto h-full text-slate-800 dark:text-slate-200">
-                        {outputText}
-                      </pre>
+                      outputViewMode === 'diagram' && (mode === 'xml-to-bpmn' || mode === 'json-to-xml') ? (
+                        <div className="h-full w-full bg-white relative">
+                          <BpmnViewer 
+                            xml={outputText} 
+                            onChange={setOutputText}
+                            onClose={() => setOutputViewMode('code')} 
+                            fileName={uploadedFileName ? (uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName) : 'diagram'}
+                          />
+                        </div>
+                      ) : (
+                        <pre className="p-4 text-sm font-mono whitespace-pre overflow-auto h-full text-slate-800 dark:text-slate-200">
+                          {outputText}
+                        </pre>
+                      )
                     ) : (
                       <div className="h-full flex items-center justify-center text-slate-400 italic text-sm">
                         Waiting for transformation...
