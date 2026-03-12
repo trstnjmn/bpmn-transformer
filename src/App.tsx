@@ -27,6 +27,7 @@ import {
   Eye
 } from "lucide-react";
 import { BpmnViewer } from './components/BpmnViewer';
+import { Input } from "@/components/ui/input"
 
 
 const App: React.FC = () => {
@@ -70,7 +71,7 @@ const App: React.FC = () => {
         const proophResult = mapProophToConversionInput(jsonObj);
 
         // 3. Auto-layout with ELK — also returns which edges are valid
-        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements, proophResult.process.lanes);
+        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements, proophResult.process.lanes, uploadedFileName);
 
         // 4. Remove SequenceFlows that ELK rejected (dangling refs to filtered nodes)
         const cleanedElements = proophResult.process.elements.filter(e =>
@@ -84,7 +85,7 @@ const App: React.FC = () => {
         };
 
         // 6. Convert to BPMN XML
-        const finalXml = await convertToBpmnXml(finalInput);
+        const finalXml = await convertToBpmnXml(finalInput, uploadedFileName);
         setOutputText(finalXml);
       } else {
         const json = await convertFromBpmnXml(inputText);
@@ -130,6 +131,7 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleReset();
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFileName(file.name);
@@ -221,21 +223,23 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Input Section */}
               <Card className="shadow-md border-slate-200 dark:border-slate-800">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
+                <CardHeader className="pb-3 grid grid-cols-2 grid-rows-1 gap-2">
+                  <CardTitle className="text-lg flex items-center justify-between ">
                     Input {mode === 'json-to-xml' ? 'JSON' : 'XML'}
-                    {uploadedFileName && (
-                      <span className="text-xs font-normal text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded">
-                        {uploadedFileName}
-                      </span>
-                    )}
                   </CardTitle>
+                  <Input
+                      placeholder='Dateititel'
+                      value={uploadedFileName}
+                      onChange={(e) => setUploadedFileName(e.target.value)}
+                  />
+                </CardHeader>
+                <CardContent>
                   <CardDescription>
                     {mode === 'xml-to-bpmn' && "Paste your Prooph Board XML here."}
                     {mode === 'xml-to-json' && "Paste any XML to see its JSON representation."}
                     {mode === 'json-to-xml' && "Paste a JSON process definition."}
                   </CardDescription>
-                </CardHeader>
+                </CardContent>
                 <CardContent>
                   <div className="space-y-4">
                     <Textarea
@@ -310,11 +314,13 @@ const App: React.FC = () => {
                     ) : outputText ? (
                       outputViewMode === 'diagram' && (mode === 'xml-to-bpmn' || mode === 'json-to-xml') ? (
                         <div className="h-full w-full bg-white relative">
-                          <BpmnViewer 
-                            xml={outputText} 
-                            onChange={setOutputText}
-                            onClose={() => setOutputViewMode('code')} 
-                            fileName={uploadedFileName ? (uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName) : 'diagram'}
+                          // In your App.tsx, modify the BpmnViewer call:
+                          <BpmnViewer
+                              xml={outputText}
+                              onChange={setOutputText}
+                              onClose={() => setOutputViewMode('code')}
+                              fileName={uploadedFileName ? (uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName) : 'diagram'}
+                              title={`${uploadedFileName || 'diagram'} - ${new Date().toLocaleDateString()}`}
                           />
                         </div>
                       ) : (

@@ -4,6 +4,7 @@ export type BPMNElementType =
   | 'bpmn:IntermediateCatchEvent'
   | 'bpmn:UserTask' 
   | 'bpmn:ServiceTask' 
+  | 'bpmn:Process'
   | 'bpmn:BusinessRuleTask'
   | 'bpmn:Task'
   | 'bpmn:ExclusiveGateway' 
