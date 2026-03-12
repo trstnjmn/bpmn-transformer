@@ -51,16 +51,24 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
   const isTask = type.includes('Task') || type === 'bpmn:Task';
   if (isTask) {
     const charWidth = 6.5;
-    const totalTextWidth = nameToUse.length * charWidth;
-    let width = 120;
-    if (totalTextWidth > 80) {
-      width = Math.min(240, 120 + (totalTextWidth - 80) * 0.25);
+    
+    // Check for explicit line breaks introduced by wordWrap
+    const lines = nameToUse.split('\n');
+    const estimatedLines = Math.max(lines.length, 1);
+    
+    // Find the longest line to determine width
+    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+    const totalTextWidth = longestLine * charWidth;
+    
+    let width = 100;
+    if (totalTextWidth > 75) {
+      width = Math.min(200, 100 + (totalTextWidth - 75));
     }
-    const usableWidth = width - 25;
-    const estimatedLines = Math.max(1, Math.ceil(totalTextWidth / usableWidth));
+    
     const lineHeight = 17;
-    const calculatedHeight = Math.max(baseSize.height, (estimatedLines * lineHeight) + 35);
-
+    // Base height 80, add space for more than 2 lines
+    const calculatedHeight = Math.max(baseSize.height, (estimatedLines * lineHeight) + 30);
+    
     return {
       width: Math.round(width),
       height: Math.round(calculatedHeight),

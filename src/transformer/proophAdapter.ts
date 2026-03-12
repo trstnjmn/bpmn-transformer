@@ -1,5 +1,6 @@
 import type { ConversionInput, ProcessElement, DiagramLayout, LaneDefinition } from './types';
 import { extractRoleAndCleanName, getRoleRank } from './roleService';
+import { wordWrap } from './utils';
 
 /**
  * Helper to get attributes from an object, handling both '@_prefix' and '@attributes' nesting.
@@ -154,7 +155,12 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       }
       usedPositions.add(posKey);
 
-      elements.push({ id, type, name: cleanName || id, role });
+      elements.push({ 
+        id, 
+        type, 
+        name: wordWrap(cleanName || id, 18), 
+        role 
+      });
 
       layout.push({
         id: id + '_di',

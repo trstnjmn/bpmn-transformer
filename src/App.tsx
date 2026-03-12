@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
-import { convertToBpmnXml, convertFromBpmnXml, mapProophToConversionInput, computeElkLayout } from './transformer';
+import { convertToBpmnXml, convertFromBpmnXml, mapProophToConversionInput, computeElkLayout, beautifyXml } from './transformer';
 import type { ConversionInput } from './transformer';
 
 const App: React.FC = () => {
@@ -108,7 +108,12 @@ const App: React.FC = () => {
     setUploadedFileName(file.name);
     const reader = new FileReader();
     reader.onload = (event) => {
-      setInputText(event.target?.result as string);
+      const content = event.target?.result as string;
+      if (mode === 'xml-to-bpmn' || mode === 'xml-to-json') {
+        setInputText(beautifyXml(content));
+      } else {
+        setInputText(content);
+      }
     };
     reader.readAsText(file);
   };

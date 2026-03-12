@@ -155,15 +155,25 @@ button:disabled {
 }
 
 .output-container {
+  width: 100%;
+  height: calc(100vh - 400px);
+  /* Dynamic height based on viewport */
+  min-height: 450px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  height: calc(100vh - 400px);
-  /* Match textarea height */
-  min-height: 450px;
-  overflow: auto;
   padding: 1rem;
-  position: relative;
+  color: #a5f3fc;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.95rem;
+  resize: vertical;
+  /* Allow manual resizing */
+  transition: border-color 0.2s;
+  line-height: 1.5;
+  white-space: pre;
+  /* Keep code formatting but allows horizontal scroll */
+  overflow: auto;
+  /* Ensure scrollbars appear only when needed */
 }
 
 pre {
