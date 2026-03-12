@@ -99,7 +99,7 @@ textarea {
   color: #a5f3fc;
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 0.95rem;
-  resize: vertical;
+  resize: none;
   /* Allow manual resizing */
   transition: border-color 0.2s;
   line-height: 1.5;
@@ -166,7 +166,7 @@ button:disabled {
   color: #a5f3fc;
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 0.95rem;
-  resize: vertical;
+  resize: none;
   /* Allow manual resizing */
   transition: border-color 0.2s;
   line-height: 1.5;
