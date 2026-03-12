@@ -73,20 +73,28 @@ export function getRoleRank(roleName: string | undefined): number {
 export function extractRoleAndCleanName(name: string): { role?: string; cleanName: string } {
   let role = getRoleFromName(name);
   let cleanName = name;
-  
-  if (role) {
-    // Optional: remove the matched role from the name if it's a prefix like "[SysAdmin] ..."
-    // For now, we'll keep the name as is but we could strip brackets etc.
-    const bracketMatch = name.match(/^\[(.*?)\]\s*(.*)$/);
-    if (bracketMatch) {
-      // If bracket content matches a role, we use the rest as cleanName
-      const possibleRole = getRoleFromName(bracketMatch[1]);
-      if (possibleRole) {
-        role = possibleRole;
-        cleanName = bracketMatch[2];
-      }
+
+  // 1. Check for "[Role] Task Name" pattern
+  const bracketMatch = name.match(/^\[(.*?)\]\s*(.*)$/);
+  if (bracketMatch) {
+    const rawRole = bracketMatch[1].trim();
+    role = getRoleFromName(rawRole) || rawRole;
+    cleanName = bracketMatch[2].trim() || cleanName;
+    return { role, cleanName };
+  }
+
+  // 2. Check for "Role: Task Name" pattern
+  const colonMatch = name.match(/^([^:]+):\s*(.*)$/);
+  if (colonMatch) {
+    const rawRole = colonMatch[1].trim();
+    // Only accept it as a role if it's reasonably short (avoids taking whole sentences)
+    if (rawRole.length > 0 && rawRole.length < 35) {
+      role = getRoleFromName(rawRole) || rawRole;
+      cleanName = colonMatch[2].trim() || cleanName;
+      return { role, cleanName };
     }
   }
-  
+
+  // If no prefix pattern was found, return the fuzzy matched role (if any) and the original name
   return { role, cleanName };
 }
