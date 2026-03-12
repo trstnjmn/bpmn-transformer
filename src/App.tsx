@@ -186,28 +186,30 @@ const App: React.FC = () => {
         </header>
 
         {/* Main Interface */}
-        <main className="space-y-6">
-          <Tabs
-            defaultValue="xml-to-bpmn"
-            value={mode}
+        <main className="space-y-8">
+          <Tabs 
+            defaultValue="xml-to-bpmn" 
+            value={mode} 
             onValueChange={(v) => {
               setMode(v as any);
               handleReset();
             }}
-            className="w-full"
+            className="flex flex-col gap-8"
           >
-            <div className="flex items-center justify-between mb-4">
-              <TabsList className="grid grid-cols-3 w-full max-w-md">
-                <TabsTrigger value="xml-to-bpmn">XML ➔ BPMN</TabsTrigger>
-                <TabsTrigger value="xml-to-json">XML ➔ JSON</TabsTrigger>
-                <TabsTrigger value="json-to-xml">JSON ➔ XML</TabsTrigger>
-              </TabsList>
-
-              <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 italic">
-                <Settings2 className="h-4 w-4" />
-                {mode === 'xml-to-bpmn' && "Auto-layout with ELK engine enabled"}
-                {mode === 'xml-to-json' && "Direct structure mapping"}
-                {mode === 'json-to-xml' && "BPMN 2.0 schema validation"}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <TabsList className="grid grid-cols-3 w-full max-w-md">
+                  <TabsTrigger value="xml-to-bpmn">XML ➔ BPMN</TabsTrigger>
+                  <TabsTrigger value="xml-to-json">XML ➔ JSON</TabsTrigger>
+                  <TabsTrigger value="json-to-xml">JSON ➔ XML</TabsTrigger>
+                </TabsList>
+                
+                <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 italic">
+                  <Settings2 className="h-4 w-4" />
+                  {mode === 'xml-to-bpmn' && "Auto-layout with ELK engine enabled"}
+                  {mode === 'xml-to-json' && "Direct structure mapping"}
+                  {mode === 'json-to-xml' && "BPMN 2.0 schema validation"}
+                </div>
               </div>
             </div>
 
