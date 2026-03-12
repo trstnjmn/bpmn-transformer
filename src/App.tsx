@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
-import { convertToBpmnXml, convertFromBpmnXml, mapProophToConversionInput } from './transformer';
+import { convertToBpmnXml, convertFromBpmnXml, mapProophToConversionInput, computeElkLayout } from './transformer';
 import type { ConversionInput } from './transformer';
 
 const App: React.FC = () => {
@@ -35,14 +35,27 @@ const App: React.FC = () => {
         const xml = await convertToBpmnXml(finalInput);
         setOutputText(xml);
       } else if (mode === 'xml-to-bpmn') {
-        // 1. Raw XML to Generic JSON
+        // 1. Raw XML → Generic JSON
         const jsonObj = await convertFromBpmnXml(inputText);
 
-        // 2. Map Prooph (mxGraph) JSON to our internal BPMN format
-        // This will throw if the XML isn't a valid Prooph board XML
-        const finalInput = mapProophToConversionInput(jsonObj);
+        // 2. Map Prooph mxGraph JSON → internal BPMN format
+        const proophResult = mapProophToConversionInput(jsonObj);
 
-        // 3. Convert our internal format to BPMN XML
+        // 3. Auto-layout with ELK — also returns which edges are valid
+        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements);
+
+        // 4. Remove SequenceFlows that ELK rejected (dangling refs to filtered nodes)
+        const cleanedElements = proophResult.process.elements.filter(e =>
+          e.type !== 'bpmn:SequenceFlow' || validEdgeIds.has(e.id)
+        );
+
+        // 5. Build final input with clean elements + ELK layout
+        const finalInput: ConversionInput = {
+          process: { ...proophResult.process, elements: cleanedElements },
+          layout: elkLayout,
+        };
+
+        // 6. Convert to BPMN XML
         const finalXml = await convertToBpmnXml(finalInput);
         setOutputText(finalXml);
       } else {
