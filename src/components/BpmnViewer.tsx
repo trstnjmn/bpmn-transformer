@@ -10,9 +10,10 @@ interface BpmnViewerProps {
   onChange?: (xml: string) => void;
   onClose?: () => void;
   fileName?: string;
+  title?: string;
 }
 
-export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml, onChange, onClose, fileName = 'diagram' }) => {
+export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml, onChange, onClose, fileName = 'diagram', title }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnModeler | null>(null);
   const [error, setError] = useState<string>('');
@@ -59,7 +60,7 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml, onChange, onClose, 
       try {
         await modelerRef.current.importXML(xml);
         setError('');
-        
+
         // Zoom to fit
         const canvas = modelerRef.current.get('canvas') as any;
         canvas.zoom('fit-viewport', 'auto');
@@ -109,16 +110,16 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml, onChange, onClose, 
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
-        
+
         const pngUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = pngUrl;
         link.download = `${fileName}.png`;
         link.click();
-        
+
         URL.revokeObjectURL(url);
       };
-      
+
       img.src = url;
     } catch (err) {
       console.error('Error exporting PNG', err);
@@ -126,44 +127,53 @@ export const BpmnViewer: React.FC<BpmnViewerProps> = ({ xml, onChange, onClose, 
   };
 
   return (
-    <div className={isFullscreen 
-      ? "fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 p-4 flex flex-col" 
-      : "flex flex-col h-full w-full"
-    }>
-      {error && (
-        <div className="bg-red-100 text-red-700 p-2 text-sm rounded-md mb-2">
-          {error}
+      <div className={isFullscreen
+          ? "fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 p-4 flex flex-col"
+          : "flex flex-col h-full w-full"
+      }>
+        {/* Title bar with filename and date */}
+        {title && (
+            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-t-md border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 truncate">
+                {title}
+              </h2>
+            </div>
+        )}
+
+        {error && (
+            <div className="bg-red-100 text-red-700 p-2 text-sm rounded-md mb-2">
+              {error}
+            </div>
+        )}
+        <div className={`flex-grow border border-slate-300 rounded-md relative bg-white ${!isFullscreen && 'min-h-[500px]'}`}>
+          <div ref={containerRef} className="w-full h-full absolute inset-0" />
         </div>
-      )}
-      <div className={`flex-grow border border-slate-300 rounded-md relative bg-white ${!isFullscreen && 'min-h-[500px]'}`}>
-        <div ref={containerRef} className="w-full h-full absolute inset-0" />
+        <div className="flex gap-2 mt-4 justify-between items-center">
+          <div>
+            <Button
+                onClick={() => {
+                  if (isFullscreen && onClose) {
+                    onClose();
+                  } else {
+                    setIsFullscreen(!isFullscreen);
+                  }
+                }}
+                variant="secondary"
+                className="flex items-center gap-2"
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              {isFullscreen ? "Close Fullscreen" : "Fullscreen"}
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={exportSvg} variant="outline" className="flex items-center gap-2">
+              <Download className="w-4 h-4" /> Download SVG
+            </Button>
+            <Button onClick={exportPng} variant="default" className="flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" /> Download PNG
+            </Button>
+          </div>
+        </div>
       </div>
-      <div className="flex gap-2 mt-4 justify-between items-center">
-        <div>
-          <Button 
-            onClick={() => {
-              if (isFullscreen && onClose) {
-                onClose();
-              } else {
-                setIsFullscreen(!isFullscreen);
-              }
-            }} 
-            variant="secondary" 
-            className="flex items-center gap-2"
-          >
-            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />} 
-            {isFullscreen ? "Close Fullscreen" : "Fullscreen"}
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={exportSvg} variant="outline" className="flex items-center gap-2">
-            <Download className="w-4 h-4" /> Download SVG
-          </Button>
-          <Button onClick={exportPng} variant="default" className="flex items-center gap-2">
-            <ImageIcon className="w-4 h-4" /> Download PNG
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 };

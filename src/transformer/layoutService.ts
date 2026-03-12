@@ -110,34 +110,20 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
  * automatic layout using the ELK layout engine.
  * Returns a new DiagramLayout[] with absolute x/y positions.
  */
-export async function computeElkLayout(elements: ProcessElement[], lanes?: LaneDefinition[]): Promise<{
+export async function computeElkLayout(
+    elements: ProcessElement[],
+    lanes?: LaneDefinition[],
+    fileName?: string
+): Promise<{
   layout: DiagramLayout[];
   validEdgeIds: Set<string>;
 }> {
-  const nodes = elements.filter(
-    e => e.type !== 'bpmn:SequenceFlow'
-  );
-
-  // Build a set of all known node IDs so we can validate edge endpoints
+  const nodes = elements.filter(e => e.type !== 'bpmn:SequenceFlow');
   const nodeIds = new Set(nodes.map(n => n.id));
-
-  const allEdges = elements.filter(
-    e => e.type === 'bpmn:SequenceFlow' && e.sourceRef && e.targetRef
-  );
-
-  // Only include edges where BOTH source and target are known nodes
-  const edges = allEdges.filter(
-    e => nodeIds.has(e.sourceRef!) && nodeIds.has(e.targetRef!)
-  );
-
-  const skippedEdges = allEdges.length - edges.length;
-  if (skippedEdges > 0) {
-    console.warn(`[ELK] Skipped ${skippedEdges} edge(s) referencing unknown nodes.`);
-  }
-
+  const allEdges = elements.filter(e => e.type === 'bpmn:SequenceFlow' && e.sourceRef && e.targetRef);
+  const edges = allEdges.filter(e => nodeIds.has(e.sourceRef!) && nodeIds.has(e.targetRef!));
   const validEdgeIds = new Set(edges.map(e => e.id));
 
-  // Build the ELK graph structure
   const elkGraph = {
     id: 'root',
     layoutOptions: {
@@ -146,7 +132,6 @@ export async function computeElkLayout(elements: ProcessElement[], lanes?: LaneD
       'elk.spacing.nodeNode': '100',
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-      'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.partitioning': 'true',
       'elk.partitioning.spacing': '100',
@@ -157,9 +142,7 @@ export async function computeElkLayout(elements: ProcessElement[], lanes?: LaneD
         id: node.id,
         width: size.width,
         height: size.height,
-        layoutOptions: {
-          'elk.partition': String(getRoleRank(node.role)),
-        }
+        layoutOptions: { 'elk.partition': String(getRoleRank(node.role)) }
       };
     }),
     edges: edges.map(edge => ({
@@ -170,106 +153,69 @@ export async function computeElkLayout(elements: ProcessElement[], lanes?: LaneD
   };
 
   const laidOut = await elk.layout(elkGraph);
-
   const layout: DiagramLayout[] = [];
 
-  // Map node positions back to DiagramLayout
+  // 1. Nodes mappen
   for (const child of laidOut.children ?? []) {
     const node = nodes.find(n => n.id === child.id);
     const sizeInfo = getElementSize(node?.type ?? '', node?.name);
     const colors = node ? ELEMENT_COLORS[node.type] : undefined;
 
-    const shapeX = Math.round((child.x ?? 0) + (child.width! - sizeInfo.shapeWidth) / 2) + 50; // Add 50 for lane headers
-    const shapeY = Math.round(child.y ?? 0);
-
-    const layoutItem: DiagramLayout = {
+    layout.push({
       id: child.id + '_di',
       type: 'shape',
       bpmnElement: child.id,
-      x: shapeX,
-      y: shapeY,
+      x: Math.round((child.x ?? 0) + (child.width! - sizeInfo.shapeWidth) / 2) + 50,
+      y: Math.round(child.y ?? 0),
       width: sizeInfo.shapeWidth,
       height: sizeInfo.shapeHeight,
       fill: colors?.fill,
       stroke: colors?.stroke,
-    };
-
-    if (sizeInfo.label) {
-      layoutItem.label = {
-        x: Math.round((child.x ?? 0) + (child.width! - sizeInfo.label.width) / 2) + 50,
-        y: Math.round(shapeY + sizeInfo.shapeHeight + 5),
-        width: sizeInfo.label.width,
-        height: sizeInfo.label.height,
-      };
-    }
-
-    layout.push(layoutItem);
+    });
   }
 
-  // Map edge waypoints back to DiagramLayout
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // 2. Edges mappen
   for (const edge of (laidOut.edges ?? []) as any[]) {
     const sections = edge.sections ?? [];
-    const waypoints: { x: number; y: number }[] = [];
-
-    for (const section of sections) {
-      if (section.startPoint) waypoints.push({ x: Math.round(section.startPoint.x + 50), y: Math.round(section.startPoint.y) });
-      for (const bp of section.bendPoints ?? []) {
-        waypoints.push({ x: Math.round(bp.x + 50), y: Math.round(bp.y) });
-      }
-      if (section.endPoint) waypoints.push({ x: Math.round(section.endPoint.x + 50), y: Math.round(section.endPoint.y) });
-    }
-
-    layout.push({
-      id: edge.id + '_di',
-      type: 'edge',
-      bpmnElement: edge.id,
-      waypoints: waypoints.length > 0 ? waypoints : undefined,
-    });
+    const waypoints = sections.flatMap((s: any) => [
+      { x: Math.round(s.startPoint.x + 50), y: Math.round(s.startPoint.y) },
+      ...(s.bendPoints?.map((bp: any) => ({ x: Math.round(bp.x + 50), y: Math.round(bp.y) })) || []),
+      { x: Math.round(s.endPoint.x + 50), y: Math.round(s.endPoint.y) }
+    ]);
+    layout.push({ id: edge.id + '_di', type: 'edge', bpmnElement: edge.id, waypoints });
   }
 
-  // Calculate Lane Layouts if provided
-  if (lanes && lanes.length > 0) {
-    const laneMap = new Map<string, LaneDefinition>();
-    lanes.forEach(l => laneMap.set(l.id, l));
+  // 3. Titel und Header-Logik
+  if (fileName) {
+    const titleOffset = 80;
 
-    // Find the total diagram width
-    let maxEndX = 0;
+    // Verschiebe das gesamte Diagramm um 80px nach unten
     layout.forEach(item => {
-      if (item.type === 'shape' && item.x !== undefined && item.width !== undefined) {
-        maxEndX = Math.max(maxEndX, item.x + item.width);
+      item.y = (item.y || 0) + titleOffset;
+      if (item.type === 'edge' && item.waypoints) {
+        item.waypoints.forEach(wp => wp.y += titleOffset);
       }
     });
 
-    const diagramWidth = Math.max(800, maxEndX + 200);
-    const lanePadding = 40;
+  }
 
+  // 4. Lanes berechnen
+  if (lanes && lanes.length > 0) {
     lanes.forEach(lane => {
-      const laneElements = layout.filter(item => 
-        item.type === 'shape' && lane.elementIds.includes(item.bpmnElement)
-      );
-
+      const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
       if (laneElements.length === 0) return;
 
-      let minY = Infinity;
-      let maxY = -Infinity;
-
-      laneElements.forEach(item => {
-        minY = Math.min(minY, item.y || 0);
-        maxY = Math.max(maxY, (item.y || 0) + (item.height || 0));
-      });
-
-      const laneY = minY - lanePadding;
-      const laneHeight = Math.max(120, (maxY - minY) + (lanePadding * 2));
+      const minY = Math.min(...laneElements.map(i => i.y || 0));
+      const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
 
       layout.push({
         id: lane.id + '_di',
         type: 'shape',
         bpmnElement: lane.id,
-        x: 0, 
-        y: Math.max(0, laneY),
-        width: diagramWidth + 50,
-        height: laneHeight
+        x: 0,
+        y: minY - 20,
+        width: 2000,
+        height: (maxY - minY) + 40
       });
     });
   }

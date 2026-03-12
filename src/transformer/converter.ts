@@ -7,11 +7,12 @@ const moddle = new BpmnModdle();
 
 /**
  * Converts a JSON process definition into BPMN 2.0 XML.
- * 
+ *
  * @param input - The process definition and optional layout information.
+ * @param fileName - Optional filename to include in the BPMN documentation.
  * @returns A promise that resolves to the BPMN 2.0 XML string.
  */
-export async function convertToBpmnXml(input: ConversionInput): Promise<string> {
+export async function convertToBpmnXml(input: ConversionInput, fileName?: string): Promise<string> {
   const { process: processDef, layout } = input;
 
   if (!processDef) {
@@ -84,6 +85,28 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
     }
   });
 
+// 4b. Titel-Annotation erstellen
+  if (fileName) {
+    const currentDate = new Date().toLocaleDateString('de-DE', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+
+    const cleanName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+
+    const titleText = `${cleanName.toUpperCase()} | ${currentDate}`;
+    const annotationId = sanitizeId(`title_annotation_${processId}`);
+
+    const textAnnotation = moddle.create('bpmn:TextAnnotation', {
+      id: annotationId,
+      text: titleText
+    });
+
+    allElements.push(textAnnotation);
+    flowElementsMap.set(annotationId, textAnnotation);
+  }
+
   // Add all elements to the process
   process.flowElements = allElements;
 
@@ -148,16 +171,16 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
         }
 
         const shape = moddle.create('bpmndi:BPMNShape', shapeParams);
-        
+
         // If it's a lane, we can force isHorizontal if needed, though usually inherited from parent diagram
         if (targetElement.$type === 'bpmn:Lane') {
           shape.isHorizontal = true;
         }
-        
+
         planeElements.push(shape);
       } else if (l.type === 'edge') {
         const waypoints = (l.waypoints || []).map(wp =>
-          moddle.create('dc:Point', { x: wp.x, y: wp.y })
+            moddle.create('dc:Point', { x: wp.x, y: wp.y })
         );
 
         const edge = moddle.create('bpmndi:BPMNEdge', {
@@ -168,6 +191,25 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
         planeElements.push(edge);
       }
     });
+
+    if (fileName) {
+      const annotationId = sanitizeId(`title_annotation_${processId}`);
+      const textAnnotation = flowElementsMap.get(annotationId);
+
+      if (textAnnotation) {
+        const shape = moddle.create('bpmndi:BPMNShape', {
+          id: `${annotationId}_di`,
+          bpmnElement: textAnnotation,
+          bounds: moddle.create('dc:Bounds', {
+            x: 0,  // Feste Position oben links
+            y: 20,  // Feste Position oben
+            width: 400,
+            height: 40
+          })
+        });
+        planeElements.push(shape);
+      }
+    }
 
     const plane = moddle.create('bpmndi:BPMNPlane', {
       id: 'BPMNPlane_1',

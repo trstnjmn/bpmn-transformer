@@ -70,7 +70,7 @@ const App: React.FC = () => {
         const proophResult = mapProophToConversionInput(jsonObj);
 
         // 3. Auto-layout with ELK — also returns which edges are valid
-        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements, proophResult.process.lanes);
+        const { layout: elkLayout, validEdgeIds } = await computeElkLayout(proophResult.process.elements, proophResult.process.lanes, uploadedFileName);
 
         // 4. Remove SequenceFlows that ELK rejected (dangling refs to filtered nodes)
         const cleanedElements = proophResult.process.elements.filter(e =>
@@ -84,7 +84,7 @@ const App: React.FC = () => {
         };
 
         // 6. Convert to BPMN XML
-        const finalXml = await convertToBpmnXml(finalInput);
+        const finalXml = await convertToBpmnXml(finalInput, uploadedFileName);
         setOutputText(finalXml);
       } else {
         const json = await convertFromBpmnXml(inputText);
@@ -130,6 +130,7 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleReset();
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFileName(file.name);
@@ -310,11 +311,13 @@ const App: React.FC = () => {
                     ) : outputText ? (
                       outputViewMode === 'diagram' && (mode === 'xml-to-bpmn' || mode === 'json-to-xml') ? (
                         <div className="h-full w-full bg-white relative">
-                          <BpmnViewer 
-                            xml={outputText} 
-                            onChange={setOutputText}
-                            onClose={() => setOutputViewMode('code')} 
-                            fileName={uploadedFileName ? (uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName) : 'diagram'}
+                          // In your App.tsx, modify the BpmnViewer call:
+                          <BpmnViewer
+                              xml={outputText}
+                              onChange={setOutputText}
+                              onClose={() => setOutputViewMode('code')}
+                              fileName={uploadedFileName ? (uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName) : 'diagram'}
+                              title={`${uploadedFileName || 'diagram'} - ${new Date().toLocaleDateString()}`}
                           />
                         </div>
                       ) : (
