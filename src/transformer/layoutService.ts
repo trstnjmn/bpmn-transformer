@@ -26,6 +26,7 @@ const ELEMENT_COLORS: Record<string, { fill: string; stroke: string }> = {
 
 /**
  * Calculates the size of a BPMN element based on its type and label.
+ * Aims for a 4:3 aspect ratio for larger tasks.
  */
 function getElementSize(type: string, name?: string): { width: number; height: number } {
   const baseSize = ELEMENT_SIZES[type] ?? { width: 100, height: 80 };
@@ -37,14 +38,27 @@ function getElementSize(type: string, name?: string): { width: number; height: n
     return baseSize;
   }
 
-  // Heuristic: ~8 pixels per character (font-size 12-14px)
-  // Tasks have padding on both sides
+  // Heuristic for single-line width: ~8 pixels per character (font-size 12-14px)
   const padding = 30;
-  const estimatedWidth = (name.length * 8) + padding;
+  const singleLineTotalWidth = (name.length * 8) + padding;
+  
+  // If the text is short enough for the base size, just return base size
+  if (singleLineTotalWidth <= baseSize.width) {
+    return baseSize;
+  }
+
+  // To maintain a 4:3 aspect ratio while providing enough area for text
+  // We estimate the required area based on the single-line width and standard height
+  const targetArea = singleLineTotalWidth * baseSize.height;
+  
+  // Area = w * h, and w/h = 4/3 => w = 4/3 * h
+  // Area = 4/3 * h^2 => h = sqrt(Area * 3 / 4)
+  const calculatedHeight = Math.sqrt(targetArea * 3 / 4);
+  const calculatedWidth = (calculatedHeight * 4) / 3;
 
   return {
-    width: Math.max(baseSize.width, estimatedWidth),
-    height: baseSize.height,
+    width: Math.max(baseSize.width, Math.round(calculatedWidth)),
+    height: Math.max(baseSize.height, Math.round(calculatedHeight)),
   };
 }
 
