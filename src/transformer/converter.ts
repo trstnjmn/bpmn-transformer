@@ -105,15 +105,29 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
           height: l.height || 80
         });
 
-        const shape = moddle.create('bpmndi:BPMNShape', {
+        const shapeParams: any = {
           id: sanitizeId(l.id || sanitizedElementId + '_di'),
           bpmnElement: targetElement,
           bounds: bounds,
           'bioc:stroke': l.stroke,
           'bioc:fill': l.fill,
-          'color:background-color': l.fill, // Support for newer bpmn-js versions
+          'color:background-color': l.fill,
           'color:border-color': l.stroke
-        });
+        };
+
+        if (l.label) {
+          const labelBounds = moddle.create('dc:Bounds', {
+            x: l.label.x,
+            y: l.label.y,
+            width: l.label.width,
+            height: l.label.height
+          });
+          shapeParams.label = moddle.create('bpmndi:BPMNLabel', {
+            bounds: labelBounds
+          });
+        }
+
+        const shape = moddle.create('bpmndi:BPMNShape', shapeParams);
         planeElements.push(shape);
       } else if (l.type === 'edge') {
         const waypoints = (l.waypoints || []).map(wp =>

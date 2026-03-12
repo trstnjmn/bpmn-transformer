@@ -25,40 +25,74 @@ const ELEMENT_COLORS: Record<string, { fill: string; stroke: string }> = {
 };
 
 /**
- * Calculates the size of a BPMN element based on its type and label.
- * Aims for a 4:3 aspect ratio for larger tasks.
+ * Detailed size info for an element, including child/label dimensions.
  */
-function getElementSize(type: string, name?: string): { width: number; height: number } {
+interface ElementSizeInfo {
+  width: number;       // Total layout width
+  height: number;      // Total layout height
+  shapeWidth: number;  // Direct BPMN element width
+  shapeHeight: number; // Direct BPMN element height
+  label?: {            // Optional external label info
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Calculates the size of a BPMN element based on its type and label.
+ * Handle internal text (Tasks) and external text (Events/Gateways).
+ */
+function getElementSize(type: string, name?: string): ElementSizeInfo {
   const baseSize = ELEMENT_SIZES[type] ?? { width: 100, height: 80 };
+  const nameToUse = name || '';
 
-  // Only scale task types which have text inside
+  // 1. Task types (Internal labels)
   const isTask = type.includes('Task') || type === 'bpmn:Task';
+  if (isTask) {
+    const charWidth = 6.5;
+    const totalTextWidth = nameToUse.length * charWidth;
+    let width = 120;
+    if (totalTextWidth > 80) {
+      width = Math.min(240, 120 + (totalTextWidth - 80) * 0.25);
+    }
+    const usableWidth = width - 25;
+    const estimatedLines = Math.max(1, Math.ceil(totalTextWidth / usableWidth));
+    const lineHeight = 17;
+    const calculatedHeight = Math.max(baseSize.height, (estimatedLines * lineHeight) + 35);
 
-  if (!isTask || !name) {
-    return baseSize;
+    return {
+      width: Math.round(width),
+      height: Math.round(calculatedHeight),
+      shapeWidth: Math.round(width),
+      shapeHeight: Math.round(calculatedHeight),
+    };
   }
 
-  // Heuristic for single-line width: ~8 pixels per character (font-size 12-14px)
-  const padding = 30;
-  const singleLineTotalWidth = (name.length * 8) + padding;
-  
-  // If the text is short enough for the base size, just return base size
-  if (singleLineTotalWidth <= baseSize.width) {
-    return baseSize;
+  // 2. Event/Gateway types (External labels)
+  if (nameToUse) {
+    const charWidth = 7;
+    const labelWidth = Math.min(150, Math.max(80, nameToUse.length * charWidth));
+    const estimatedLines = Math.ceil((nameToUse.length * charWidth) / labelWidth);
+    const labelHeight = estimatedLines * 15;
+
+    return {
+      width: Math.max(baseSize.width, labelWidth),
+      height: baseSize.height + labelHeight + 10, // gap of 10
+      shapeWidth: baseSize.width,
+      shapeHeight: baseSize.height,
+      label: {
+        width: labelWidth,
+        height: labelHeight
+      }
+    };
   }
 
-  // To maintain a 4:3 aspect ratio while providing enough area for text
-  // We estimate the required area based on the single-line width and standard height
-  const targetArea = singleLineTotalWidth * baseSize.height;
-  
-  // Area = w * h, and w/h = 4/3 => w = 4/3 * h
-  // Area = 4/3 * h^2 => h = sqrt(Area * 3 / 4)
-  const calculatedHeight = Math.sqrt(targetArea * 3 / 4);
-  const calculatedWidth = (calculatedHeight * 4) / 3;
-
+  // 3. Default
   return {
-    width: Math.max(baseSize.width, Math.round(calculatedWidth)),
-    height: Math.max(baseSize.height, Math.round(calculatedHeight)),
+    width: baseSize.width,
+    height: baseSize.height,
+    shapeWidth: baseSize.width,
+    shapeHeight: baseSize.height,
   };
 }
 
@@ -128,20 +162,34 @@ export async function computeElkLayout(elements: ProcessElement[]): Promise<{
   // Map node positions back to DiagramLayout
   for (const child of laidOut.children ?? []) {
     const node = nodes.find(n => n.id === child.id);
-    const size = getElementSize(node?.type ?? '', node?.name);
+    const sizeInfo = getElementSize(node?.type ?? '', node?.name);
     const colors = node ? ELEMENT_COLORS[node.type] : undefined;
 
-    layout.push({
+    const shapeX = Math.round((child.x ?? 0) + (child.width! - sizeInfo.shapeWidth) / 2);
+    const shapeY = Math.round(child.y ?? 0);
+
+    const layoutItem: DiagramLayout = {
       id: child.id + '_di',
       type: 'shape',
       bpmnElement: child.id,
-      x: Math.round(child.x ?? 0),
-      y: Math.round(child.y ?? 0),
-      width: size.width,
-      height: size.height,
+      x: shapeX,
+      y: shapeY,
+      width: sizeInfo.shapeWidth,
+      height: sizeInfo.shapeHeight,
       fill: colors?.fill,
       stroke: colors?.stroke,
-    });
+    };
+
+    if (sizeInfo.label) {
+      layoutItem.label = {
+        x: Math.round((child.x ?? 0) + (child.width! - sizeInfo.label.width) / 2),
+        y: Math.round(shapeY + sizeInfo.shapeHeight + 5),
+        width: sizeInfo.label.width,
+        height: sizeInfo.label.height,
+      };
+    }
+
+    layout.push(layoutItem);
   }
 
   // Map edge waypoints back to DiagramLayout
