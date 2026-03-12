@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
 
   const handleTransform = async () => {
     setIsProcessing(true);
@@ -88,7 +89,15 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = isXml ? 'process.bpmn' : 'process.json';
+    
+    // Use the original filename if available, otherwise fallback to default
+    let fileName = isXml ? 'process.bpmn' : 'process.json';
+    if (uploadedFileName) {
+      const baseName = uploadedFileName.substring(0, uploadedFileName.lastIndexOf('.')) || uploadedFileName;
+      fileName = `${baseName}.${isXml ? 'bpmn' : 'json'}`;
+    }
+    
+    link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -96,6 +105,7 @@ const App: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadedFileName(file.name);
     const reader = new FileReader();
     reader.onload = (event) => {
       setInputText(event.target?.result as string);
@@ -168,7 +178,7 @@ const App: React.FC = () => {
             </label>
             <button
               className="secondary reset-btn"
-              onClick={() => { setInputText(''); setOutputText(''); setError(''); }}
+              onClick={() => { setInputText(''); setOutputText(''); setError(''); setUploadedFileName(''); }}
               style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
