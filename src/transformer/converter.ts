@@ -21,6 +21,8 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
   // 1. Create Definitions (Root Container)
   const definitions = moddle.create('bpmn:Definitions', {
     targetNamespace: 'http://bpmn.io/schema/bpmn',
+    'xmlns:bioc': 'http://bpmn.io/schema/bpmn/biocolor/1.0',
+    'xmlns:color': 'http://www.omg.org/spec/BPMN/non-normative/color/1.0',
     exporter: 'Antigravity BPMN Transformer',
     exporterVersion: '1.0'
   });
@@ -106,7 +108,11 @@ export async function convertToBpmnXml(input: ConversionInput): Promise<string> 
         const shape = moddle.create('bpmndi:BPMNShape', {
           id: sanitizeId(l.id || sanitizedElementId + '_di'),
           bpmnElement: targetElement,
-          bounds: bounds
+          bounds: bounds,
+          'bioc:stroke': l.stroke,
+          'bioc:fill': l.fill,
+          'color:background-color': l.fill, // Support for newer bpmn-js versions
+          'color:border-color': l.stroke
         });
         planeElements.push(shape);
       } else if (l.type === 'edge') {

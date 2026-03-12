@@ -32,6 +32,8 @@ export interface DiagramLayout {
   width?: number;
   height?: number;
   waypoints?: { x: number; y: number }[];
+  fill?: string;
+  stroke?: string;
 }
 
 export interface ConversionInput {
