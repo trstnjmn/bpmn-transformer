@@ -27,6 +27,7 @@ import {
   Eye
 } from "lucide-react";
 import { BpmnViewer } from './components/BpmnViewer';
+import { Input } from "@/components/ui/input"
 
 
 const App: React.FC = () => {
@@ -222,21 +223,23 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Input Section */}
               <Card className="shadow-md border-slate-200 dark:border-slate-800">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
+                <CardHeader className="pb-3 grid grid-cols-2 grid-rows-1 gap-2">
+                  <CardTitle className="text-lg flex items-center justify-between ">
                     Input {mode === 'json-to-xml' ? 'JSON' : 'XML'}
-                    {uploadedFileName && (
-                      <span className="text-xs font-normal text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded">
-                        {uploadedFileName}
-                      </span>
-                    )}
                   </CardTitle>
+                  <Input
+                      placeholder='Dateititel'
+                      value={uploadedFileName}
+                      onChange={(e) => setUploadedFileName(e.target.value)}
+                  />
+                </CardHeader>
+                <CardContent>
                   <CardDescription>
                     {mode === 'xml-to-bpmn' && "Paste your Prooph Board XML here."}
                     {mode === 'xml-to-json' && "Paste any XML to see its JSON representation."}
                     {mode === 'json-to-xml' && "Paste a JSON process definition."}
                   </CardDescription>
-                </CardHeader>
+                </CardContent>
                 <CardContent>
                   <div className="space-y-4">
                     <Textarea
