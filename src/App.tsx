@@ -24,7 +24,7 @@ import {
   CheckCircle2,
   Settings2,
   Code,
-  Eye
+  Eye,
 } from "lucide-react";
 import { BpmnViewer } from './components/BpmnViewer';
 import { Input } from "@/components/ui/input"
@@ -163,7 +163,7 @@ const App: React.FC = () => {
           <div className="space-y-1">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
               <FileCode className="h-8 w-8 text-blue-600" />
-              BPMN Transformer
+              Proophboard to BPMN Converter
             </h1>
             <p className="text-slate-500 dark:text-slate-400">
               Convert between Prooph Board XML, standard BPMN 2.0 and JSON.
@@ -373,7 +373,7 @@ const App: React.FC = () => {
         </main>
 
         <footer className="text-center text-slate-400 text-xs py-10 border-t">
-          <p>© 2026 BPMN Transformer Tool. Built with React & Tailwind CSS.</p>
+          <p>© 2026 Proophboard to BPMN Converter Tool. Built with React & Tailwind CSS. Go to <a href='https://github.com/trstnjmn/bpmn-transformer' target='_blank' className='hover:underline text-blue-600'>github</a></p>
         </footer>
       </div>
     </div>
