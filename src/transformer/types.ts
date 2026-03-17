@@ -1,14 +1,14 @@
-export type BPMNElementType = 
-  | 'bpmn:StartEvent' 
-  | 'bpmn:EndEvent' 
-  | 'bpmn:IntermediateCatchEvent'
-  | 'bpmn:UserTask' 
-  | 'bpmn:ServiceTask' 
-  | 'bpmn:Process'
-  | 'bpmn:BusinessRuleTask'
-  | 'bpmn:Task'
-  | 'bpmn:ExclusiveGateway' 
-  | 'bpmn:SequenceFlow';
+export type BPMNElementType =
+    | 'bpmn:StartEvent'
+    | 'bpmn:EndEvent'
+    | 'bpmn:IntermediateCatchEvent'
+    | 'bpmn:UserTask'
+    | 'bpmn:ServiceTask'
+    | 'bpmn:Process'
+    | 'bpmn:BusinessRuleTask'
+    | 'bpmn:Task'
+    | 'bpmn:ExclusiveGateway'
+    | 'bpmn:SequenceFlow';
 
 export interface ProcessElement {
   id: string;

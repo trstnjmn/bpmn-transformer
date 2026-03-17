@@ -8,7 +8,7 @@ import { wordWrap } from './utils';
 function getAttrs(obj: any): any {
   if (!obj) return {};
   const attrs: any = {};
-  
+
   // 1. Check for nested @attributes
   if (obj['@attributes']) {
     Object.assign(attrs, obj['@attributes']);
@@ -40,7 +40,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
   // 1. Collect ALL cells and metadata
   const allCells: any[] = [];
   const metadataMap = new Map<string, any>();
-  
+
   const processObject = (obj: any) => {
     if (!obj || typeof obj !== 'object') return;
 
@@ -56,7 +56,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       cells.forEach((cell: any) => {
         const cellAttrs = getAttrs(cell);
         if (!cellAttrs.id && id) {
-          cell['@_id'] = id; 
+          cell['@_id'] = id;
         }
         allCells.push(cell);
       });
@@ -92,10 +92,10 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
   const getAbsolutePos = (id: string): { x: number, y: number } => {
     const entry = cellMap.get(id);
     if (!entry || !entry.geometry) return { x: 0, y: 0 };
-    
+
     let x = parseInt(entry.geometry.x || '0');
     let y = parseInt(entry.geometry.y || '0');
-    
+
     // Offset for labels/points if it's an edge, skip for now to avoid confusion
     if (entry.attr.edge === '1') return { x: 0, y: 0 };
 
@@ -104,7 +104,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       x += parentPos.x;
       y += parentPos.y;
     }
-    
+
     return { x, y };
   };
 
@@ -121,11 +121,11 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
     if (!id || id === '0' || id === '1') return;
 
     if (attr.vertex === '1' || attr.vertex === 1) {
-      let type: any = 'bpmn:Task'; 
+      let type: any = 'bpmn:Task';
       let rawLabel = meta?.label || attr.value || '';
       // Strip HTML tags and normalize spacing
-      rawLabel = rawLabel.replace(/<br\s*\/?>/gi, '\n'); 
-      rawLabel = rawLabel.replace(/<[^>]*>/g, ' '); 
+      rawLabel = rawLabel.replace(/<br\s*\/?>/gi, '\n');
+      rawLabel = rawLabel.replace(/<[^>]*>/g, ' ');
       rawLabel = rawLabel.replace(/&nbsp;/g, ' ');
       rawLabel = rawLabel.replace(/[ \t]+/g, ' ').trim();
 
@@ -138,7 +138,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       } else if (style.includes('policy')) {
         type = 'bpmn:BusinessRuleTask';
       } else if (style.includes('boundedContext') || style.includes('feature') || style.includes('freeText') || style.includes('icon') || style.includes('image')) {
-        return; 
+        return;
       }
 
       let { x, y } = getAbsolutePos(id);
@@ -162,11 +162,11 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       }
       usedPositions.add(posKey);
 
-      elements.push({ 
-        id, 
-        type, 
-        name: wordWrap(cleanName || id, 18), 
-        role 
+      elements.push({
+        id,
+        type,
+        name: wordWrap(cleanName || id, 18),
+        role
       });
 
       layout.push({
@@ -187,7 +187,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
 
       const waypoints: { x: number, y: number }[] = [];
       const parentPos = attr.parent ? getAbsolutePos(attr.parent) : { x: 0, y: 0 };
-      
+
       const geoArray = cell.mxGeometry?.Array || cell.mxGeometry?.points;
       if (geoArray?.mxPoint) {
         const points = Array.isArray(geoArray.mxPoint) ? geoArray.mxPoint : [geoArray.mxPoint];
@@ -211,29 +211,34 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
     }
   });
 
+
   // 4. Group into Lanes
   const lanes: LaneDefinition[] = [];
   const elementsByRole = new Map<string, string[]>();
 
+  // Wichtig: Wir brauchen eine Liste aller Rollen für ELK
   elements.forEach(el => {
     if (el.type !== 'bpmn:SequenceFlow') {
       const roleName = el.role || 'Unassigned';
-      const list = elementsByRole.get(roleName) || [];
-      list.push(el.id);
-      elementsByRole.set(roleName, list);
+      if (!elementsByRole.has(roleName)) {
+        elementsByRole.set(roleName, []);
+      }
+      elementsByRole.get(roleName)!.push(el.id);
     }
   });
 
-  // Create lanes ordered by role rank
+  // Rollen sortieren (wichtig für die vertikale Abfolge im Diagramm)
   const sortedRoles = Array.from(elementsByRole.keys()).sort((a, b) => {
-    if (a === 'Unassigned') return 1;
-    if (b === 'Unassigned') return -1;
-    return getRoleRank(a) - getRoleRank(b);
+    const rankA = getRoleRank(a);
+    const rankB = getRoleRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    return a.localeCompare(b);
   });
 
   sortedRoles.forEach(roleName => {
     lanes.push({
-      id: `Lane_${roleName.replace(/\s+/g, '_')}`,
+      // ID bereinigen, damit sie BPMN-konform ist (keine Leerzeichen)
+      id: `Lane_${roleName.replace(/[^a-zA-Z0-9]/g, '_')}`,
       name: roleName,
       elementIds: elementsByRole.get(roleName) || []
     });
@@ -246,6 +251,8 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       elements: elements,
       lanes: lanes
     },
+    // Hinweis: Dieses Layout wird von computeElkLayout überschrieben,
+    // dient aber als Fallback, falls kein Auto-Layout gewünscht ist.
     layout: layout
   };
 }

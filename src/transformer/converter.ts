@@ -126,7 +126,9 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
 
   // 5. Handle BPMN Diagram Layout (BPMNDI)
   if (layout && layout.length > 0) {
-    const planeElements: any[] = [];
+    const laneShapes: any[] = [];
+    const otherShapes: any[] = [];
+    const edges: any[] = [];
 
     layout.forEach(l => {
       const sanitizedElementId = sanitizeId(l.bpmnElement);
@@ -142,36 +144,23 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
           height: l.height || 80
         });
 
-        const shapeParams: any = {
+        const shape = moddle.create('bpmndi:BPMNShape', {
           id: sanitizeId(l.id || sanitizedElementId + '_di'),
           bpmnElement: targetElement,
           bounds: bounds,
+          isHorizontal: targetElement.$type === 'bpmn:Lane', // Lanes sind in BPMN meist horizontal
           'bioc:stroke': l.stroke,
           'bioc:fill': l.fill,
           'color:background-color': l.fill,
           'color:border-color': l.stroke
-        };
+        });
 
-        if (l.label) {
-          const labelBounds = moddle.create('dc:Bounds', {
-            x: l.label.x,
-            y: l.label.y,
-            width: l.label.width,
-            height: l.label.height
-          });
-          shapeParams.label = moddle.create('bpmndi:BPMNLabel', {
-            bounds: labelBounds
-          });
-        }
-
-        const shape = moddle.create('bpmndi:BPMNShape', shapeParams);
-
-        // If it's a lane, we can force isHorizontal if needed, though usually inherited from parent diagram
+        // Einsortieren nach Typ für korrektes Layering
         if (targetElement.$type === 'bpmn:Lane') {
-          shape.isHorizontal = true;
+          laneShapes.push(shape);
+        } else {
+          otherShapes.push(shape);
         }
-
-        planeElements.push(shape);
       } else if (l.type === 'edge') {
         const waypoints = (l.waypoints || []).map(wp =>
             moddle.create('dc:Point', { x: wp.x, y: wp.y })
@@ -182,33 +171,16 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
           bpmnElement: targetElement,
           waypoint: waypoints
         });
-        planeElements.push(edge);
+        edges.push(edge);
       }
     });
 
-    if (fileName) {
-      const annotationId = sanitizeId(`title_annotation_${processId}`);
-      const textAnnotation = flowElementsMap.get(annotationId);
-
-      if (textAnnotation) {
-        const shape = moddle.create('bpmndi:BPMNShape', {
-          id: `${annotationId}_di`,
-          bpmnElement: textAnnotation,
-          bounds: moddle.create('dc:Bounds', {
-            x: 0,
-            y: 20,
-            width: 600,
-            height: 40
-          })
-        });
-        planeElements.push(shape);
-      }
-    }
-
+    // WICHTIG: Hier werden die Listen zusammengeführt
     const plane = moddle.create('bpmndi:BPMNPlane', {
       id: 'BPMNPlane_1',
       bpmnElement: process,
-      planeElement: planeElements
+      // Reihenfolge: Lanes (unten) -> Knoten -> Kanten (oben)
+      planeElement: [...laneShapes, ...otherShapes, ...edges]
     });
 
     const diagram = moddle.create('bpmndi:BPMNDiagram', {

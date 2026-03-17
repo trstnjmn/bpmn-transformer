@@ -2,7 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 
 /**
  * Converts ANY XML into a clean JSON structure.
- * 
+ *
  * @param xml - The XML string.
  * @returns The converted JSON object.
  */
