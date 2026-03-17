@@ -129,12 +129,12 @@ export async function computeElkLayout(
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.spacing.nodeNode': '100',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+      'elk.spacing.nodeNode': '150',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '150',
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.partitioning': 'true',
-      'elk.partitioning.spacing': '150',
+      'elk.partitioning.spacing': '300',
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
@@ -160,7 +160,14 @@ export async function computeElkLayout(
   for (const child of laidOut.children ?? []) {
     const node = nodes.find(n => n.id === child.id);
     const sizeInfo = getElementSize(node?.type ?? '', node?.name);
-    const colors = node ? ELEMENT_COLORS[node.type] : undefined;
+    
+    // Default colors from map
+    let colors = node ? ELEMENT_COLORS[node.type] : undefined;
+    
+    // Override for shared elements
+    if (node?.shared) {
+      colors = { fill: '#f3e5f5', stroke: '#7b1fa2' }; // Soft purple for shared roles
+    }
 
     layout.push({
       id: child.id + '_di',
@@ -213,7 +220,7 @@ export async function computeElkLayout(
       const diagramWidth = Math.max(2000, ...layout.filter(i => i.type === 'shape').map(i => (i.x || 0) + (i.width || 0) + 100));
       
       let currentY = activeLanes[0] ? 
-        Math.min(...layout.filter(item => item.type === 'shape' && activeLanes[0].elementIds.includes(item.bpmnElement)).map(i => i.y || 0)) - 60 
+        Math.min(...layout.filter(item => item.type === 'shape' && activeLanes[0].elementIds.includes(item.bpmnElement)).map(i => i.y || 0)) - 100 
         : 0;
 
       activeLanes.forEach((lane, index) => {
@@ -221,7 +228,7 @@ export async function computeElkLayout(
         const minY = Math.min(...laneElements.map(i => i.y || 0));
         const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
 
-        let height = (maxY - minY) + 60;
+        let height = (maxY - minY) + 100;
         
         // Ensure lane starts where previous lane ended
         const laneY = currentY;
@@ -232,12 +239,28 @@ export async function computeElkLayout(
           const nextLaneElements = layout.filter(item => item.type === 'shape' && nextLane.elementIds.includes(item.bpmnElement));
           const nextMinY = Math.min(...nextLaneElements.map(i => i.y || 0));
           
-          // Midpoint between current lane's elements bottom and next lane's elements top
-          const boundaryY = (maxY + nextMinY) / 2;
+          const rawBoundaryY = (maxY + nextMinY) / 2;
+          
+          // STRICT separation: If partitions overlap, we MUST force the line 
+          // to be at least 60px away from the bottom of the current and top of next.
+          // If the gap is too small, we center it.
+          let boundaryY;
+          if (nextMinY - maxY >= 120) {
+            boundaryY = rawBoundaryY; // Healthy gap
+          } else {
+            // Gap is tight or overlapping - force the line between them
+            // but prioritize the 60px margin from the top lane if possible
+            boundaryY = maxY + 60;
+            // But don't cut the next lane's elements
+            if (boundaryY > nextMinY - 40) {
+              boundaryY = (maxY + nextMinY) / 2;
+            }
+          }
+          
           height = boundaryY - laneY;
         } else {
           // Last lane gets some extra padding
-          height = (maxY - laneY) + 60;
+          height = (maxY - laneY) + 100;
         }
 
         layout.push({

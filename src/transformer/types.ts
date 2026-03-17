@@ -15,6 +15,7 @@ export interface ProcessElement {
   type: BPMNElementType;
   name?: string;
   roles?: string[]; // For role-based sorting/lanes
+  shared?: boolean; // Flag for elements belonging to multiple roles
   sourceRef?: string; // For sequence flows
   targetRef?: string; // For sequence flows
 }

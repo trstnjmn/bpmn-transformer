@@ -163,13 +163,16 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       usedPositions.add(posKey);
 
       // Visual cue for shared roles
-      const displayName = roles.length > 1 ? `* ${cleanName}` : cleanName;
+      const isShared = roles.length > 1;
+      const sharedSuffix = isShared ? `\n[Shared: ${roles.join(', ')}]` : '';
+      const displayName = `${cleanName}${sharedSuffix}`;
 
       elements.push({ 
         id, 
         type, 
-        name: wordWrap(displayName || id, 18), 
-        roles 
+        name: wordWrap(displayName || id, 22), // Slightly wider wrap for shared info
+        roles,
+        shared: isShared
       });
 
       layout.push({

@@ -61,14 +61,24 @@ export function getRolesFromName(name: string): string[] {
  * Lower number means higher position (top of diagram).
  */
 export function getRoleRank(roleName: string | undefined, allRoles: string[] = []): number {
-  if (!roleName) return ROLES.length + allRoles.length; // Default to bottom
+  const normalizedName = (!roleName || roleName === 'Unassigned') ? 'Unassigned' : roleName;
   
-  const index = ROLES.findIndex(r => r.name === roleName);
-  if (index !== -1) return index;
+  // 1. Check if it matches a predefined role
+  const predefinedIndex = ROLES.findIndex(r => r.name === normalizedName);
+  if (predefinedIndex !== -1) return predefinedIndex;
 
-  // For custom roles, find their position in the provided set of all roles
-  const customRoleIndex = allRoles.indexOf(roleName);
-  return customRoleIndex === -1 ? ROLES.length + allRoles.length : ROLES.length + customRoleIndex;
+  // 2. Determine rank for custom roles and "Unassigned"
+  // We want a contiguous list: [Predefined Roles...] [Custom Roles...] [Unassigned]
+  const customRoleNames = allRoles.filter(name => 
+    name !== 'Unassigned' && !ROLES.some(r => r.name === name)
+  );
+  
+  if (normalizedName === 'Unassigned') {
+    return ROLES.length + customRoleNames.length;
+  }
+
+  const customIndex = customRoleNames.indexOf(normalizedName);
+  return customIndex === -1 ? ROLES.length + customRoleNames.length : ROLES.length + customIndex;
 }
 
 /**
