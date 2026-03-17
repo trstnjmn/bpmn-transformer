@@ -38,63 +38,94 @@ export const ROLES = [
 ];
 
 /**
- * Tries to extract a role from a given name/string.
+ * Tries to extract all applicable roles from a given name/string.
  * Uses fuzzy matching based on defined patterns.
  */
-export function getRoleFromName(name: string): string | undefined {
-  if (!name) return undefined;
+export function getRolesFromName(name: string): string[] {
+  if (!name) return [];
   
-  // Also check if name is in format "[Role] Task Name" or "Role: Task Name"
   const cleanName = name.toLowerCase();
+  const foundRoles: string[] = [];
   
   for (const role of ROLES) {
     if (role.patterns.some(pattern => pattern.test(cleanName))) {
-      return role.name;
+      foundRoles.push(role.name);
     }
   }
   
-  return undefined;
+  return foundRoles;
 }
 
 /**
  * Returns the rank (vertical order) of a role.
  * Lower number means higher position (top of diagram).
  */
-export function getRoleRank(roleName: string | undefined): number {
-  if (!roleName) return ROLES.length; // Default to bottom
+export function getRoleRank(roleName: string | undefined, allRoles: string[] = []): number {
+  const normalizedName = (!roleName || roleName === 'Unassigned') ? 'Unassigned' : roleName;
   
-  const index = ROLES.findIndex(r => r.name === roleName);
-  return index === -1 ? ROLES.length : index;
+  // 1. Check if it matches a predefined role
+  const predefinedIndex = ROLES.findIndex(r => r.name === normalizedName);
+  if (predefinedIndex !== -1) return predefinedIndex;
+
+  // 2. Determine rank for custom roles and "Unassigned"
+  // We want a contiguous list: [Predefined Roles...] [Custom Roles...] [Unassigned]
+  const customRoleNames = allRoles.filter(name => 
+    name !== 'Unassigned' && !ROLES.some(r => r.name === name)
+  );
+  
+  if (normalizedName === 'Unassigned') {
+    return ROLES.length + customRoleNames.length;
+  }
+
+  const customIndex = customRoleNames.indexOf(normalizedName);
+  return customIndex === -1 ? ROLES.length + customRoleNames.length : ROLES.length + customIndex;
 }
 
 /**
- * Tries to find a role in the name and returns the cleaned name (without role prefix) and the role name.
+ * Tries to find roles in the name and returns the cleaned name (without role prefix) and the role names.
  */
-export function extractRoleAndCleanName(name: string): { role?: string; cleanName: string } {
-  let role = getRoleFromName(name);
+export function extractRolesAndCleanName(name: string): { roles: string[]; cleanName: string } {
+  let roles = getRolesFromName(name);
   let cleanName = name;
 
-  // 1. Check for "[Role] Task Name" pattern
+  // 1. Check for "[Role1, Role2] Task Name" pattern
   const bracketMatch = name.match(/^\[(.*?)\]\s*(.*)$/);
   if (bracketMatch) {
-    const rawRole = bracketMatch[1].trim();
-    role = getRoleFromName(rawRole) || rawRole;
+    const rawRoles = bracketMatch[1].split(',').map(r => r.trim());
+    const mappedRoles: string[] = [];
+    
+    rawRoles.forEach(rawRole => {
+      const matched = getRolesFromName(rawRole);
+      if (matched.length > 0) {
+        mappedRoles.push(...matched);
+      } else {
+        mappedRoles.push(rawRole);
+      }
+    });
+
+    // Remove duplicates
+    roles = Array.from(new Set(mappedRoles));
     cleanName = bracketMatch[2].trim() || cleanName;
-    return { role, cleanName };
+    return { roles, cleanName };
   }
 
   // 2. Check for "Role: Task Name" pattern
   const colonMatch = name.match(/^([^:]+):\s*(.*)$/);
   if (colonMatch) {
     const rawRole = colonMatch[1].trim();
-    // Only accept it as a role if it's reasonably short (avoids taking whole sentences)
+    // Only accept it as a role prefix if it's reasonably short 
     if (rawRole.length > 0 && rawRole.length < 35) {
-      role = getRoleFromName(rawRole) || rawRole;
+      const matched = getRolesFromName(rawRole);
+      if (matched.length > 0) {
+        roles = matched;
+      } else {
+        roles = [rawRole];
+      }
       cleanName = colonMatch[2].trim() || cleanName;
-      return { role, cleanName };
+      return { roles, cleanName };
     }
   }
 
-  // If no prefix pattern was found, return the fuzzy matched role (if any) and the original name
-  return { role, cleanName };
+  // If no prefix pattern was found, return the fuzzy matched roles (if any) and the original name
+  return { roles, cleanName };
 }
