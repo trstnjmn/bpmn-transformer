@@ -1,21 +1,20 @@
-export type BPMNElementType =
-  | 'bpmn:StartEvent'
-  | 'bpmn:EndEvent'
+export type BPMNElementType = 
+  | 'bpmn:StartEvent' 
+  | 'bpmn:EndEvent' 
   | 'bpmn:IntermediateCatchEvent'
-  | 'bpmn:UserTask'
-  | 'bpmn:ServiceTask'
+  | 'bpmn:UserTask' 
+  | 'bpmn:ServiceTask' 
   | 'bpmn:Process'
   | 'bpmn:BusinessRuleTask'
   | 'bpmn:Task'
-  | 'bpmn:ExclusiveGateway'
+  | 'bpmn:ExclusiveGateway' 
   | 'bpmn:SequenceFlow';
 
 export interface ProcessElement {
   id: string;
   type: BPMNElementType;
   name?: string;
-  roles?: string[]; // For role-based sorting/lanes
-  shared?: boolean; // Flag for elements belonging to multiple roles
+  role?: string; // For role-based sorting/lanes
   sourceRef?: string; // For sequence flows
   targetRef?: string; // For sequence flows
 }

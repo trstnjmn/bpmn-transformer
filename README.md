@@ -6,12 +6,7 @@ BPMN Transformer is a powerful web-based utility designed to convert, validate, 
 ## 🚀 Features
 
 - **Prooph XML to BPMN 2.0:** Seamlessly convert Prooph Board XML outputs into valid, standard BPMN 2.0 diagrams.
-- **Advanced Auto-Layout with ELK:** 
-  - **Intelligent Partitioning:** Automatically groups elements into lanes based on roles with optimized vertical spacing.
-  - **Safe Boundary Logic:** Ensures elements never overlap or sit on lane lines with guaranteed minimum margins.
-- **Role & Collaboration Support:**
-  - **Multiple Role Detection:** Detects multiple roles from task labels (e.g., `[Role A, Role B] Task Name`).
-  - **Shared Element Visualization:** Marks elements belonging to multiple roles with an explicit `[Shared: ...]` suffix and distinct purple highlighting.
+- **Auto-Layout with ELK:** Automatically generates well-structured, visually appealing layouts for your BPMN processes using the powerful ELK (Eclipse Layout Kernel) engine.
 - **Data Conversion:**
   - **XML ➔ BPMN:** Direct conversion with layout generation.
   - **XML ➔ JSON:** Parse any XML into a clean, structural JSON representation.

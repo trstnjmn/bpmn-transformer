@@ -1,5 +1,5 @@
 import type { ConversionInput, ProcessElement, DiagramLayout, LaneDefinition } from './types';
-import { extractRolesAndCleanName, getRoleRank } from './roleService';
+import { extractRoleAndCleanName, getRoleRank } from './roleService';
 import { wordWrap } from './utils';
 
 /**
@@ -129,7 +129,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       rawLabel = rawLabel.replace(/&nbsp;/g, ' ');
       rawLabel = rawLabel.replace(/[ \t]+/g, ' ').trim();
 
-      let { roles, cleanName } = extractRolesAndCleanName(rawLabel);
+      let { role, cleanName } = extractRoleAndCleanName(rawLabel);
 
       if (style.includes('event')) {
         type = 'bpmn:IntermediateCatchEvent';
@@ -162,17 +162,11 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       }
       usedPositions.add(posKey);
 
-      // Visual cue for shared roles
-      const isShared = roles.length > 1;
-      const sharedSuffix = isShared ? `\n[Shared: ${roles.join(', ')}]` : '';
-      const displayName = `${cleanName}${sharedSuffix}`;
-
       elements.push({ 
         id, 
         type, 
-        name: wordWrap(displayName || id, 22), // Slightly wider wrap for shared info
-        roles,
-        shared: isShared
+        name: wordWrap(cleanName || id, 18), 
+        role 
       });
 
       layout.push({
@@ -223,10 +217,10 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
 
   elements.forEach(el => {
     if (el.type !== 'bpmn:SequenceFlow') {
-      const primaryRole = el.roles?.[0] || 'Unassigned';
-      const list = elementsByRole.get(primaryRole) || [];
+      const roleName = el.role || 'Unassigned';
+      const list = elementsByRole.get(roleName) || [];
       list.push(el.id);
-      elementsByRole.set(primaryRole, list);
+      elementsByRole.set(roleName, list);
     }
   });
 
@@ -234,7 +228,7 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
   const sortedRoles = Array.from(elementsByRole.keys()).sort((a, b) => {
     if (a === 'Unassigned') return 1;
     if (b === 'Unassigned') return -1;
-    return getRoleRank(a, Array.from(elementsByRole.keys())) - getRoleRank(b, Array.from(elementsByRole.keys()));
+    return getRoleRank(a) - getRoleRank(b);
   });
 
   sortedRoles.forEach(roleName => {
