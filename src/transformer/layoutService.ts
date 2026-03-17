@@ -134,15 +134,16 @@ export async function computeElkLayout(
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.partitioning': 'true',
-      'elk.partitioning.spacing': '100',
+      'elk.partitioning.spacing': '150',
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
+      const allRoleNames = lanes?.map(l => l.name) || [];
       return {
         id: node.id,
         width: size.width,
         height: size.height,
-        layoutOptions: { 'elk.partition': String(getRoleRank(node.role)) }
+        layoutOptions: { 'elk.partition': String(getRoleRank(node.roles?.[0], allRoleNames)) }
       };
     }),
     edges: edges.map(edge => ({
@@ -201,23 +202,57 @@ export async function computeElkLayout(
 
   // 4. Lanes berechnen
   if (lanes && lanes.length > 0) {
-    lanes.forEach(lane => {
-      const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
-      if (laneElements.length === 0) return;
+    const allRoleNames = lanes.map(l => l.name);
 
-      const minY = Math.min(...laneElements.map(i => i.y || 0));
-      const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
+    // Filter out lanes with no elements and sort by role rank
+    const activeLanes = lanes
+      .filter(lane => layout.some(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement)))
+      .sort((a, b) => getRoleRank(a.name, allRoleNames) - getRoleRank(b.name, allRoleNames));
 
-      layout.push({
-        id: lane.id + '_di',
-        type: 'shape',
-        bpmnElement: lane.id,
-        x: 0,
-        y: minY - 20,
-        width: 2000,
-        height: (maxY - minY) + 40
+    if (activeLanes.length > 0) {
+      const diagramWidth = Math.max(2000, ...layout.filter(i => i.type === 'shape').map(i => (i.x || 0) + (i.width || 0) + 100));
+      
+      let currentY = activeLanes[0] ? 
+        Math.min(...layout.filter(item => item.type === 'shape' && activeLanes[0].elementIds.includes(item.bpmnElement)).map(i => i.y || 0)) - 60 
+        : 0;
+
+      activeLanes.forEach((lane, index) => {
+        const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
+        const minY = Math.min(...laneElements.map(i => i.y || 0));
+        const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
+
+        let height = (maxY - minY) + 60;
+        
+        // Ensure lane starts where previous lane ended
+        const laneY = currentY;
+
+        // If there's a next lane, we might want to split the gap
+        if (index < activeLanes.length - 1) {
+          const nextLane = activeLanes[index + 1];
+          const nextLaneElements = layout.filter(item => item.type === 'shape' && nextLane.elementIds.includes(item.bpmnElement));
+          const nextMinY = Math.min(...nextLaneElements.map(i => i.y || 0));
+          
+          // Midpoint between current lane's elements bottom and next lane's elements top
+          const boundaryY = (maxY + nextMinY) / 2;
+          height = boundaryY - laneY;
+        } else {
+          // Last lane gets some extra padding
+          height = (maxY - laneY) + 60;
+        }
+
+        layout.push({
+          id: lane.id + '_di',
+          type: 'shape',
+          bpmnElement: lane.id,
+          x: 0,
+          y: Math.round(laneY),
+          width: Math.round(diagramWidth),
+          height: Math.round(height)
+        });
+
+        currentY = laneY + height;
       });
-    });
+    }
   }
 
   return { layout, validEdgeIds };
