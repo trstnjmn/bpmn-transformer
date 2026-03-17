@@ -201,23 +201,77 @@ export async function computeElkLayout(
 
   // 4. Lanes berechnen
   if (lanes && lanes.length > 0) {
-    lanes.forEach(lane => {
-      const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
-      if (laneElements.length === 0) return;
+    // Collect all shapes and find the maximum width of the diagram
+    const shapes = layout.filter(item => item.type === 'shape');
+    
+    // Use ELK's calculated width if available, otherwise fallback to elements
+    const elkWidth = (laidOut as any).width || 0;
+    const maxX = Math.max(...shapes.map(s => (s.x || 0) + (s.width || 0)), elkWidth + 50, 800);
+    
+    // Also consider edges in width calculation
+    const edgesWidth = (laidOut.edges ?? []).reduce((max, edge: any) => {
+      const edgeMaxX = (edge.sections ?? []).reduce((sMax: number, s: any) => {
+        const points = [s.startPoint, ...(s.bendPoints || []), s.endPoint];
+        return Math.max(sMax, ...points.map((p: any) => p.x + 50));
+      }, 0);
+      return Math.max(max, edgeMaxX);
+    }, 0);
 
-      const minY = Math.min(...laneElements.map(i => i.y || 0));
-      const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
+    const diagramWidth = Math.max(maxX, edgesWidth) + 150; // Increased padding
+
+    // Map lanes to their element boundaries
+    const laneBounds = lanes
+      .map(lane => {
+        const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
+        if (laneElements.length === 0) return null;
+
+        const minY = Math.min(...laneElements.map(i => i.y || 0));
+        const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
+        const rank = getRoleRank(lane.name);
+
+        return { lane, minY, maxY, rank };
+      })
+      .filter((b): b is NonNullable<typeof b> => b !== null)
+      .sort((a, b) => a.rank - b.rank);
+
+    // Calculate contiguous boundaries
+    for (let i = 0; i < laneBounds.length; i++) {
+      const current = laneBounds[i];
+      const next = laneBounds[i + 1];
+
+      let laneY: number;
+      let laneHeight: number;
+
+      if (i === 0) {
+        // First lane: start above elements
+        laneY = current.minY - 50;
+      } else {
+        // Subsequent lanes: start where previous ended
+        const prevLaneDI = layout[layout.length - 1];
+        laneY = (prevLaneDI.y || 0) + (prevLaneDI.height || 0);
+      }
+
+      if (next) {
+        // Boundary between current and next
+        const currentBottom = current.maxY + 40;
+        const nextTop = next.minY - 40;
+        const boundary = Math.round(Math.max(currentBottom, (currentBottom + nextTop) / 2));
+        laneHeight = boundary - laneY;
+      } else {
+        // Last lane
+        laneHeight = (current.maxY - laneY) + 60;
+      }
 
       layout.push({
-        id: lane.id + '_di',
+        id: current.lane.id + '_di',
         type: 'shape',
-        bpmnElement: lane.id,
+        bpmnElement: current.lane.id,
         x: 0,
-        y: minY - 20,
-        width: 2000,
-        height: (maxY - minY) + 40
+        y: laneY,
+        width: diagramWidth,
+        height: Math.max(laneHeight, 100)
       });
-    });
+    }
   }
 
   return { layout, validEdgeIds };
