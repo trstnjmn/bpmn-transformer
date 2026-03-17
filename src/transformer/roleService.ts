@@ -61,10 +61,15 @@ export function getRoleFromName(name: string): string | undefined {
  * Lower number means higher position (top of diagram).
  */
 export function getRoleRank(roleName: string | undefined): number {
-  if (!roleName) return ROLES.length; // Default to bottom
+  if (!roleName) return 1000; // Ganz weit unten
 
   const index = ROLES.findIndex(r => r.name === roleName);
-  return index === -1 ? ROLES.length : index;
+  if (index !== -1) return index;
+
+  // Für ganz neue Rollen: Gib einen Wert basierend auf dem Namen zurück,
+  // damit verschiedene neue Rollen nicht alle den gleichen Rank (ROLES.length) haben.
+  // So bekommt "Z-Rolle" einen höheren Rank als "A-Rolle".
+  return 500 + roleName.charCodeAt(0);
 }
 
 /**

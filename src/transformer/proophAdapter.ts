@@ -211,29 +211,34 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
     }
   });
 
+
   // 4. Group into Lanes
   const lanes: LaneDefinition[] = [];
   const elementsByRole = new Map<string, string[]>();
 
+  // Wichtig: Wir brauchen eine Liste aller Rollen für ELK
   elements.forEach(el => {
     if (el.type !== 'bpmn:SequenceFlow') {
       const roleName = el.role || 'Unassigned';
-      const list = elementsByRole.get(roleName) || [];
-      list.push(el.id);
-      elementsByRole.set(roleName, list);
+      if (!elementsByRole.has(roleName)) {
+        elementsByRole.set(roleName, []);
+      }
+      elementsByRole.get(roleName)!.push(el.id);
     }
   });
 
-  // Create lanes ordered by role rank
+  // Rollen sortieren (wichtig für die vertikale Abfolge im Diagramm)
   const sortedRoles = Array.from(elementsByRole.keys()).sort((a, b) => {
-    if (a === 'Unassigned') return 1;
-    if (b === 'Unassigned') return -1;
-    return getRoleRank(a) - getRoleRank(b);
+    const rankA = getRoleRank(a);
+    const rankB = getRoleRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    return a.localeCompare(b);
   });
 
   sortedRoles.forEach(roleName => {
     lanes.push({
-      id: `Lane_${roleName.replace(/\s+/g, '_')}`,
+      // ID bereinigen, damit sie BPMN-konform ist (keine Leerzeichen)
+      id: `Lane_${roleName.replace(/[^a-zA-Z0-9]/g, '_')}`,
       name: roleName,
       elementIds: elementsByRole.get(roleName) || []
     });
@@ -246,6 +251,8 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       elements: elements,
       lanes: lanes
     },
+    // Hinweis: Dieses Layout wird von computeElkLayout überschrieben,
+    // dient aber als Fallback, falls kein Auto-Layout gewünscht ist.
     layout: layout
   };
 }

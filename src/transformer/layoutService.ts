@@ -15,48 +15,56 @@ const ELEMENT_SIZES: Record<string, { width: number; height: number }> = {
   'bpmn:ExclusiveGateway': { width: 50, height: 50 },
 };
 
-/**
- * Recommended colors for BPMN elements.
- */
 const ELEMENT_COLORS: Record<string, { fill: string; stroke: string }> = {
-  'bpmn:UserTask': { fill: '#fff9c4', stroke: '#fbc02d' }, // Soft yellow
-  'bpmn:ServiceTask': { fill: '#e3f2fd', stroke: '#1e88e5' }, // Soft blue
-  'bpmn:BusinessRuleTask': { fill: '#e8f5e9', stroke: '#2e7d32' }, // Soft green
-  'bpmn:Task': { fill: '#f5f5f5', stroke: '#757575' }, // Soft grey
+  'bpmn:UserTask': { fill: '#fff9c4', stroke: '#fbc02d' },
+  'bpmn:ServiceTask': { fill: '#e3f2fd', stroke: '#1e88e5' },
+  'bpmn:BusinessRuleTask': { fill: '#e8f5e9', stroke: '#2e7d32' },
+  'bpmn:Task': { fill: '#f5f5f5', stroke: '#757575' },
 };
 
-/**
- * Detailed size info for an element, including child/label dimensions.
- */
 interface ElementSizeInfo {
-  width: number;       // Total layout width
-  height: number;      // Total layout height
-  shapeWidth: number;  // Direct BPMN element width
-  shapeHeight: number; // Direct BPMN element height
-  label?: {            // Optional external label info
-    width: number;
-    height: number;
-  };
+  width: number;
+  height: number;
+  shapeWidth: number;
+  shapeHeight: number;
+  label?: { width: number; height: number };
 }
 
 /**
- * Calculates the size of a BPMN element based on its type and label.
- * Handle internal text (Tasks) and external text (Events/Gateways).
+ * Hilfsfunktion: Berechnet den exakten Ankerpunkt am Rand eines Shapes.
+ * Verhindert, dass Pfeile in Kreise (Events) oder Rauten (Gateways) hineinragen.
  */
+function getAnchorPoint(nodeType: string, shape: DiagramLayout, isSource: boolean) {
+  const x = shape.x || 0;
+  const y = shape.y || 0;
+  const w = shape.width || 0;
+
+  const TASK_MID = 40;
+  let yOffset = TASK_MID;
+
+  if (nodeType.includes('Event')) {
+    yOffset = 18; // Mitte von 36px
+  } else if (nodeType.includes('Gateway')) {
+    yOffset = 25; // Mitte von 50px
+  } else {
+    yOffset = (shape.height || 80) / 2;
+  }
+
+  return {
+    x: isSource ? x + w : x,
+    y: y + yOffset
+  };
+}
+
 function getElementSize(type: string, name?: string): ElementSizeInfo {
   const baseSize = ELEMENT_SIZES[type] ?? { width: 100, height: 80 };
   const nameToUse = name || '';
 
-  // 1. Task types (Internal labels)
   const isTask = type.includes('Task') || type === 'bpmn:Task';
   if (isTask) {
     const charWidth = 6.5;
-
-    // Check for explicit line breaks introduced by wordWrap
     const lines = nameToUse.split('\n');
     const estimatedLines = Math.max(lines.length, 1);
-
-    // Find the longest line to determine width
     const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
     const totalTextWidth = longestLine * charWidth;
 
@@ -66,7 +74,6 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
     }
 
     const lineHeight = 17;
-    // Base height 80, add space for more than 2 lines
     const calculatedHeight = Math.max(baseSize.height, (estimatedLines * lineHeight) + 30);
 
     return {
@@ -77,8 +84,7 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
     };
   }
 
-  // 2. Event/Gateway types (External labels)
-  if (nameToUse) {
+  if (nameToUse && !isTask) {
     const charWidth = 7;
     const labelWidth = Math.min(150, Math.max(80, nameToUse.length * charWidth));
     const estimatedLines = Math.ceil((nameToUse.length * charWidth) / labelWidth);
@@ -86,17 +92,13 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
 
     return {
       width: Math.max(baseSize.width, labelWidth),
-      height: baseSize.height + labelHeight + 10, // gap of 10
+      height: baseSize.height + labelHeight + 10,
       shapeWidth: baseSize.width,
       shapeHeight: baseSize.height,
-      label: {
-        width: labelWidth,
-        height: labelHeight
-      }
+      label: { width: labelWidth, height: labelHeight }
     };
   }
 
-  // 3. Default
   return {
     width: baseSize.width,
     height: baseSize.height,
@@ -105,11 +107,6 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
   };
 }
 
-/**
- * Takes a flat list of BPMN process elements and computes a clean,
- * automatic layout using the ELK layout engine.
- * Returns a new DiagramLayout[] with absolute x/y positions.
- */
 export async function computeElkLayout(
     elements: ProcessElement[],
     lanes?: LaneDefinition[],
@@ -118,10 +115,13 @@ export async function computeElkLayout(
   layout: DiagramLayout[];
   validEdgeIds: Set<string>;
 }> {
-  const nodes = elements.filter(e => e.type !== 'bpmn:SequenceFlow');
+  const laneIds = new Set(lanes?.map(l => l.id) || []);
+  const nodes = elements.filter(e => e.type !== 'bpmn:SequenceFlow' && !laneIds.has(e.id));
   const nodeIds = new Set(nodes.map(n => n.id));
-  const allEdges = elements.filter(e => e.type === 'bpmn:SequenceFlow' && e.sourceRef && e.targetRef);
-  const edges = allEdges.filter(e => nodeIds.has(e.sourceRef!) && nodeIds.has(e.targetRef!));
+  const edges = elements.filter(e =>
+      e.type === 'bpmn:SequenceFlow' && e.sourceRef && e.targetRef &&
+      nodeIds.has(e.sourceRef) && nodeIds.has(e.targetRef)
+  );
   const validEdgeIds = new Set(edges.map(e => e.id));
 
   const elkGraph = {
@@ -129,12 +129,12 @@ export async function computeElkLayout(
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
-      'elk.spacing.nodeNode': '100',
+      'elk.spacing.nodeNode': '80',
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-      'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.partitioning': 'true',
-      'elk.partitioning.spacing': '100',
+      'elk.separateConnectedComponents': 'false',
+      'elk.alignment': 'TOP',
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
@@ -142,7 +142,9 @@ export async function computeElkLayout(
         id: node.id,
         width: size.width,
         height: size.height,
-        layoutOptions: { 'elk.partition': String(getRoleRank(node.role)) }
+        layoutOptions: {
+          'elk.partition': String(getRoleRank(node.role))
+        }
       };
     }),
     edges: edges.map(edge => ({
@@ -154,19 +156,28 @@ export async function computeElkLayout(
 
   const laidOut = await elk.layout(elkGraph);
   const layout: DiagramLayout[] = [];
+  const X_OFFSET = 120; // Puffer für Lane-Labels
 
-  // 1. Nodes mappen
+  // 1. Shapes (Nodes) mappen
   for (const child of laidOut.children ?? []) {
     const node = nodes.find(n => n.id === child.id);
     const sizeInfo = getElementSize(node?.type ?? '', node?.name);
     const colors = node ? ELEMENT_COLORS[node.type] : undefined;
 
+    let finalYPos = Math.round(child.y ?? 0);
+
+    if (node?.type.includes('Event')) {
+      finalYPos += 22;
+    } else if (node?.type.includes('Gateway')) {
+      finalYPos += 15;
+    }
+
     layout.push({
       id: child.id + '_di',
       type: 'shape',
       bpmnElement: child.id,
-      x: Math.round((child.x ?? 0) + (child.width! - sizeInfo.shapeWidth) / 2) + 50,
-      y: Math.round(child.y ?? 0),
+      x: Math.round((child.x ?? 0)) + X_OFFSET,
+      y: finalYPos, // Nutzt den korrigierten Wert
       width: sizeInfo.shapeWidth,
       height: sizeInfo.shapeHeight,
       fill: colors?.fill,
@@ -174,48 +185,65 @@ export async function computeElkLayout(
     });
   }
 
-  // 2. Edges mappen
+  // 2. Edges mappen (mit Snapping-Hilfsfunktion)
   for (const edge of (laidOut.edges ?? []) as any[]) {
+    const sourceNode = nodes.find(n => n.id === edge.sources[0]);
+    const targetNode = nodes.find(n => n.id === edge.targets[0]);
+
+    const sourceShape = layout.find(l => l.bpmnElement === edge.sources[0]);
+    const targetShape = layout.find(l => l.bpmnElement === edge.targets[0]);
+
+    if (!sourceShape || !targetShape) continue;
+
     const sections = edge.sections ?? [];
-    const waypoints = sections.flatMap((s: any) => [
-      { x: Math.round(s.startPoint.x + 50), y: Math.round(s.startPoint.y) },
-      ...(s.bendPoints?.map((bp: any) => ({ x: Math.round(bp.x + 50), y: Math.round(bp.y) })) || []),
-      { x: Math.round(s.endPoint.x + 50), y: Math.round(s.endPoint.y) }
+    let waypoints = sections.flatMap((s: any) => [
+      { x: Math.round(s.startPoint.x + X_OFFSET), y: Math.round(s.startPoint.y) },
+      ...(s.bendPoints?.map((bp: any) => ({ x: Math.round(bp.x + X_OFFSET), y: Math.round(bp.y) })) || []),
+      { x: Math.round(s.endPoint.x + X_OFFSET), y: Math.round(s.endPoint.y) }
     ]);
+
+    if (waypoints.length >= 2) {
+      waypoints[0] = getAnchorPoint(sourceNode!.type, sourceShape, true);
+      waypoints[waypoints.length - 1] = getAnchorPoint(targetNode!.type, targetShape, false);
+    }
+
     layout.push({ id: edge.id + '_di', type: 'edge', bpmnElement: edge.id, waypoints });
   }
 
-  // 3. Titel und Header-Logik
-  if (fileName) {
-    const titleOffset = 80;
-
-    // Verschiebe das gesamte Diagramm um 80px nach unten
+  // 3. Titel-Offset
+  const titleOffset = fileName ? 80 : 0;
+  if (titleOffset > 0) {
     layout.forEach(item => {
       item.y = (item.y || 0) + titleOffset;
       if (item.type === 'edge' && item.waypoints) {
         item.waypoints.forEach(wp => wp.y += titleOffset);
       }
     });
-
   }
 
-  // 4. Lanes berechnen
+  // 4. LANES GENERIEREN (Um die positionierten Elemente herum)
   if (lanes && lanes.length > 0) {
-    lanes.forEach(lane => {
-      const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
-      if (laneElements.length === 0) return;
+    const maxDiagramWidth = Math.max(...layout.map(i => (i.x || 0) + (i.width || 0)), 1000);
 
-      const minY = Math.min(...laneElements.map(i => i.y || 0));
-      const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
+    lanes.forEach(lane => {
+      const laneContent = layout.filter(item =>
+          item.type === 'shape' && lane.elementIds.includes(item.bpmnElement)
+      );
+
+      if (laneContent.length === 0) return;
+
+      const minY = Math.min(...laneContent.map(i => i.y || 0));
+      const maxY = Math.max(...laneContent.map(i => (i.y || 0) + (i.height || 0)));
+      const padding = 20;
 
       layout.push({
         id: lane.id + '_di',
         type: 'shape',
         bpmnElement: lane.id,
-        x: 0,
-        y: minY - 20,
-        width: 2000,
-        height: (maxY - minY) + 40
+        x: 10,
+        y: minY - padding,
+        width: maxDiagramWidth + padding - 10,
+        height: (maxY - minY) + (padding * 2)
       });
     });
   }
