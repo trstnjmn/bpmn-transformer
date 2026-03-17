@@ -30,11 +30,11 @@ export function beautifyXml(xml: string): string {
  */
 export function wordWrap(text: string, maxLength: number): string {
   if (!text || text.length <= maxLength) return text;
-  
+
   const words = text.split(' ');
   let currentLine = '';
   let result = '';
-  
+
   words.forEach(word => {
     if ((currentLine + word).length > maxLength) {
       result += (result ? '\n' : '') + currentLine.trim();
@@ -43,7 +43,7 @@ export function wordWrap(text: string, maxLength: number): string {
       currentLine += word + ' ';
     }
   });
-  
+
   result += (result ? '\n' : '') + currentLine.trim();
   return result;
 }

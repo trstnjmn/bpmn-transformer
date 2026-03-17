@@ -51,24 +51,24 @@ function getElementSize(type: string, name?: string): ElementSizeInfo {
   const isTask = type.includes('Task') || type === 'bpmn:Task';
   if (isTask) {
     const charWidth = 6.5;
-    
+
     // Check for explicit line breaks introduced by wordWrap
     const lines = nameToUse.split('\n');
     const estimatedLines = Math.max(lines.length, 1);
-    
+
     // Find the longest line to determine width
     const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
     const totalTextWidth = longestLine * charWidth;
-    
+
     let width = 100;
     if (totalTextWidth > 75) {
       width = Math.min(200, 100 + (totalTextWidth - 75));
     }
-    
+
     const lineHeight = 17;
     // Base height 80, add space for more than 2 lines
     const calculatedHeight = Math.max(baseSize.height, (estimatedLines * lineHeight) + 30);
-    
+
     return {
       width: Math.round(width),
       height: Math.round(calculatedHeight),
@@ -201,74 +201,23 @@ export async function computeElkLayout(
 
   // 4. Lanes berechnen
   if (lanes && lanes.length > 0) {
-    // Collect all shapes and find the maximum width of the diagram
-    const shapes = layout.filter(item => item.type === 'shape');
-    const maxX = Math.max(...shapes.map(s => (s.x || 0) + (s.width || 0)), 500);
-    
-    // Also consider edges in width calculation
-    const edgesWidth = (laidOut.edges ?? []).reduce((max, edge: any) => {
-      const edgeMaxX = (edge.sections ?? []).reduce((sMax: number, s: any) => {
-        const points = [s.startPoint, ...(s.bendPoints || []), s.endPoint];
-        return Math.max(sMax, ...points.map((p: any) => p.x + 50));
-      }, 0);
-      return Math.max(max, edgeMaxX);
-    }, 0);
+    lanes.forEach(lane => {
+      const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
+      if (laneElements.length === 0) return;
 
-    const diagramWidth = Math.max(maxX, edgesWidth) + 100;
-
-    // Map lanes to their element boundaries
-    const laneBounds = lanes
-      .map(lane => {
-        const laneElements = layout.filter(item => item.type === 'shape' && lane.elementIds.includes(item.bpmnElement));
-        if (laneElements.length === 0) return null;
-
-        const minY = Math.min(...laneElements.map(i => i.y || 0));
-        const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
-        const rank = getRoleRank(lane.name);
-
-        return { lane, minY, maxY, rank };
-      })
-      .filter((b): b is NonNullable<typeof b> => b !== null)
-      .sort((a, b) => a.rank - b.rank);
-
-    // Calculate contiguous boundaries
-    for (let i = 0; i < laneBounds.length; i++) {
-      const current = laneBounds[i];
-      const next = laneBounds[i + 1];
-
-      let laneY = current.minY - 30;
-      let laneHeight: number;
-
-      if (i === 0) {
-        // First lane: start above elements
-        laneY = current.minY - 40;
-      } else {
-        // Subsequent lanes: start where previous ended
-        const prevLaneDI = layout[layout.length - 1];
-        laneY = (prevLaneDI.y || 0) + (prevLaneDI.height || 0);
-      }
-
-      if (next) {
-        // Boundary between current and next
-        const currentBottom = current.maxY + 20;
-        const nextTop = next.minY - 20;
-        const boundary = Math.round((currentBottom + nextTop) / 2);
-        laneHeight = boundary - laneY;
-      } else {
-        // Last lane
-        laneHeight = (current.maxY - laneY) + 40;
-      }
+      const minY = Math.min(...laneElements.map(i => i.y || 0));
+      const maxY = Math.max(...laneElements.map(i => (i.y || 0) + (i.height || 0)));
 
       layout.push({
-        id: current.lane.id + '_di',
+        id: lane.id + '_di',
         type: 'shape',
-        bpmnElement: current.lane.id,
+        bpmnElement: lane.id,
         x: 0,
-        y: laneY,
-        width: diagramWidth,
-        height: laneHeight
+        y: minY - 20,
+        width: 2000,
+        height: (maxY - minY) + 40
       });
-    }
+    });
   }
 
   return { layout, validEdgeIds };

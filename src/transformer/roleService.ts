@@ -1,39 +1,39 @@
 
 export const ROLES = [
-  { 
-    id: 'sysadmin', 
-    name: 'SysAdmin', 
-    patterns: [/sysadmin/i, /system\s*admin/i] 
+  {
+    id: 'sysadmin',
+    name: 'SysAdmin',
+    patterns: [/sysadmin/i, /system\s*admin/i]
   },
-  { 
-    id: 'techadmin', 
-    name: 'Tech Admin', 
-    patterns: [/techadmin/i, /tech\s*admin/i, /technischer\s*admin/i] 
+  {
+    id: 'techadmin',
+    name: 'Tech Admin',
+    patterns: [/techadmin/i, /tech\s*admin/i, /technischer\s*admin/i]
   },
-  { 
-    id: 'fachbereich', 
-    name: 'Fachbereich Mitarbeiter', 
-    patterns: [/fachbereich/i, /\bfb\b/i, /fach-bereich/i, /business\s*user/i] 
+  {
+    id: 'fachbereich',
+    name: 'Fachbereich Mitarbeiter',
+    patterns: [/fachbereich/i, /\bfb\b/i, /fach-bereich/i, /business\s*user/i]
   },
-  { 
-    id: 'compliance', 
-    name: 'Compliance Officer', 
-    patterns: [/compliance/i, /\bco\b/i, /compliance\s*officer/i] 
+  {
+    id: 'compliance',
+    name: 'Compliance Officer',
+    patterns: [/compliance/i, /\bco\b/i, /compliance\s*officer/i]
   },
-  { 
-    id: 'redakteur', 
-    name: 'Redakteur', 
-    patterns: [/redakteur/i, /editor/i] 
+  {
+    id: 'redakteur',
+    name: 'Redakteur',
+    patterns: [/redakteur/i, /editor/i]
   },
-  { 
-    id: 'redaktionsleitung', 
-    name: 'Redaktions-leitung', 
-    patterns: [/redaktions-leitung/i, /redaktionsleitung/i, /editorial\s*lead/i] 
+  {
+    id: 'redaktionsleitung',
+    name: 'Redaktions-leitung',
+    patterns: [/redaktions-leitung/i, /redaktionsleitung/i, /editorial\s*lead/i]
   },
-  { 
-    id: 'zenuser', 
-    name: 'ZENuser', 
-    patterns: [/zenuser/i, /\bzen\b/i, /zen-user/i] 
+  {
+    id: 'zenuser',
+    name: 'ZENuser',
+    patterns: [/zenuser/i, /\bzen\b/i, /zen-user/i]
   }
 ];
 
@@ -43,16 +43,16 @@ export const ROLES = [
  */
 export function getRoleFromName(name: string): string | undefined {
   if (!name) return undefined;
-  
+
   // Also check if name is in format "[Role] Task Name" or "Role: Task Name"
   const cleanName = name.toLowerCase();
-  
+
   for (const role of ROLES) {
     if (role.patterns.some(pattern => pattern.test(cleanName))) {
       return role.name;
     }
   }
-  
+
   return undefined;
 }
 
@@ -62,7 +62,7 @@ export function getRoleFromName(name: string): string | undefined {
  */
 export function getRoleRank(roleName: string | undefined): number {
   if (!roleName) return ROLES.length; // Default to bottom
-  
+
   const index = ROLES.findIndex(r => r.name === roleName);
   return index === -1 ? ROLES.length : index;
 }
