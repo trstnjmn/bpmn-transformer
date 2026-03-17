@@ -33,16 +33,34 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
   const process = moddle.create('bpmn:Process', {
     id: processId,
     isExecutable: true,
-    name: processDef.name || processId
   });
 
-  // Moddle structures are often arrays that need to be initialized or obtained
-  definitions.rootElements = [process];
+  // 3. Handle Lanes & Collaboration
+  const hasLanes = processDef.lanes && processDef.lanes.length > 0;
+  let collaboration: any;
+  let participant: any;
+
+  if (hasLanes) {
+    collaboration = moddle.create('bpmn:Collaboration', {
+      id: 'Collaboration_1'
+    });
+
+    participant = moddle.create('bpmn:Participant', {
+      id: 'Participant_1',
+      processRef: process,
+      // No name to avoid redundant Pool labels
+    });
+
+    collaboration.participants = [participant];
+    definitions.rootElements = [collaboration, process];
+  } else {
+    definitions.rootElements = [process];
+  }
 
   const flowElementsMap = new Map<string, any>();
   const allElements: any[] = [];
 
-  // 3. Create Flow Elements (Nodes)
+  // 4. Create Flow Elements (Nodes)
   const taskElements = processDef.elements.filter(el => el.type !== 'bpmn:SequenceFlow');
   taskElements.forEach(el => {
     const sanitizedId = sanitizeId(el.id);
@@ -55,7 +73,7 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
     flowElementsMap.set(sanitizedId, moddleEl);
   });
 
-  // 4. Create Sequence Flows
+  // 5. Create Sequence Flows
   const sequenceFlows = processDef.elements.filter(el => el.type === 'bpmn:SequenceFlow');
   sequenceFlows.forEach(el => {
     const sanitizedId = sanitizeId(el.id);
@@ -85,7 +103,7 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
     }
   });
 
-// 4a. Titel-Annotation erstellen
+  // 5a. Titel-Annotation erstellen
   if (fileName) {
     const currentDate = new Date().toLocaleDateString('de-DE');
     const cleanName = (fileName.substring(0, fileName.lastIndexOf('.')) || fileName).toUpperCase();
@@ -104,9 +122,9 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
 
   process.flowElements = allElements;
 
-  // 4b. Handle Lanes
-  if (processDef.lanes && processDef.lanes.length > 0) {
-    const laneElements = processDef.lanes.map(l => {
+  // 5b. Handle Lanes
+  if (hasLanes) {
+    const laneElements = processDef.lanes!.map(l => {
       const lane = moddle.create('bpmn:Lane', {
         id: sanitizeId(l.id),
         name: l.name,
@@ -124,9 +142,33 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
     process.laneSets = [laneSet];
   }
 
-  // 5. Handle BPMN Diagram Layout (BPMNDI)
+  // 6. Handle BPMN Diagram Layout (BPMNDI)
   if (layout && layout.length > 0) {
     const planeElements: any[] = [];
+    
+    // Add Participant DI if we have lanes
+    if (hasLanes) {
+      const laneShapes = layout.filter(l => l.type === 'shape' && (flowElementsMap.get(sanitizeId(l.bpmnElement))?.$type === 'bpmn:Lane'));
+      if (laneShapes.length > 0) {
+        const minX = Math.min(...laneShapes.map(s => s.x || 0));
+        const minY = Math.min(...laneShapes.map(s => s.y || 0));
+        const maxX = Math.max(...laneShapes.map(s => (s.x || 0) + (s.width || 0)));
+        const maxY = Math.max(...laneShapes.map(s => (s.y || 0) + (s.height || 0)));
+
+        const participantShape = moddle.create('bpmndi:BPMNShape', {
+          id: 'Participant_1_di',
+          bpmnElement: participant,
+          isHorizontal: true,
+          bounds: moddle.create('dc:Bounds', {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+          })
+        });
+        planeElements.push(participantShape);
+      }
+    }
 
     layout.forEach(l => {
       const sanitizedElementId = sanitizeId(l.bpmnElement);
@@ -166,7 +208,8 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
 
         const shape = moddle.create('bpmndi:BPMNShape', shapeParams);
 
-        // If it's a lane, we can force isHorizontal if needed, though usually inherited from parent diagram
+        // If it's a lane, we force isHorizontal. 
+        // This ensures the label is rendered in the header on the left.
         if (targetElement.$type === 'bpmn:Lane') {
           shape.isHorizontal = true;
         }
@@ -207,7 +250,7 @@ export async function convertToBpmnXml(input: ConversionInput, fileName?: string
 
     const plane = moddle.create('bpmndi:BPMNPlane', {
       id: 'BPMNPlane_1',
-      bpmnElement: process,
+      bpmnElement: hasLanes ? collaboration : process,
       planeElement: planeElements
     });
 

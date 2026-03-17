@@ -242,7 +242,6 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
   return {
     process: {
       id: 'ProophProcess',
-      name: 'Imported from Prooph Board',
       elements: elements,
       lanes: lanes
     },
