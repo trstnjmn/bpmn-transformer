@@ -112,25 +112,44 @@ export async function computeElkLayout(
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
       'org.eclipse.elk.portConstraints': 'FIXED_SIDE', // Wichtig für die Ports
     },
+    // ... innerhalb von computeElkLayout ...
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
+
+      // Prüfen, ob es ein Kreis-Element ist (Event)
+      const isEvent = node.type.includes('Event');
+
+      // Bei Events (36x36) ist die Mitte 18. Bei Tasks (z.B. Höhe 80) ist sie 40.
+      const halfHeight = size.shapeHeight / 2;
+
       return {
         id: node.id,
-        width: size.shapeWidth, // Wir nutzen nur die Shape-Breite für das Kern-Layout
+        width: size.shapeWidth,
         height: size.shapeHeight,
         ports: [
-          { id: `${node.id}_in`, layoutOptions: { 'elk.port.side': 'WEST' } },
-          { id: `${node.id}_out`, layoutOptions: { 'elk.port.side': 'EAST' } }
+          {
+            id: `${node.id}_in`,
+            x: 0,
+            y: halfHeight,
+            layoutOptions: { 'elk.port.side': 'WEST' }
+          },
+          {
+            id: `${node.id}_out`,
+            x: size.shapeWidth,
+            y: halfHeight,
+            layoutOptions: { 'elk.port.side': 'EAST' }
+          }
         ],
         layoutOptions: {
-          'elk.partition': String(getRoleRank(node.role))
+          'elk.partition': String(getRoleRank(node.role)),
+          'org.eclipse.elk.portConstraints': 'FIXED_POS',
         }
       };
     }),
     edges: edges.map(edge => ({
       id: edge.id,
-      sources: [`${edge.sourceRef}_out`], // Nutzt den Ausgangs-Port
-      targets: [`${edge.targetRef}_in`],  // Nutzt den Eingangs-Port
+      sources: [`${edge.sourceRef}_out`],
+      targets: [`${edge.targetRef}_in`],
     })),
   };
 
