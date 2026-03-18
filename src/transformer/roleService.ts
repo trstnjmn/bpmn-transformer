@@ -1,103 +1,83 @@
-
-export const ROLES = [
-  {
-    id: 'sysadmin',
-    name: 'SysAdmin',
-    patterns: [/sysadmin/i, /system\s*admin/i]
-  },
-  {
-    id: 'techadmin',
-    name: 'Tech Admin',
-    patterns: [/techadmin/i, /tech\s*admin/i, /technischer\s*admin/i]
-  },
-  {
-    id: 'fachbereich',
-    name: 'Fachbereich Mitarbeiter',
-    patterns: [/fachbereich/i, /\bfb\b/i, /fach-bereich/i, /business\s*user/i]
-  },
-  {
-    id: 'compliance',
-    name: 'Compliance Officer',
-    patterns: [/compliance/i, /\bco\b/i, /compliance\s*officer/i]
-  },
-  {
-    id: 'redakteur',
-    name: 'Redakteur',
-    patterns: [/redakteur/i, /editor/i]
-  },
-  {
-    id: 'redaktionsleitung',
-    name: 'Redaktions-leitung',
-    patterns: [/redaktions-leitung/i, /redaktionsleitung/i, /editorial\s*lead/i]
-  },
-  {
-    id: 'zenuser',
-    name: 'ZENuser',
-    patterns: [/zenuser/i, /\bzen\b/i, /zen-user/i]
-  }
-];
-
 /**
- * Tries to extract a role from a given name/string.
- * Uses fuzzy matching based on defined patterns.
+ * Bereinigt einen Text extrem gründlich von HTML und Whitespace.
+ * Dies wird intern für den Vergleich genutzt, um doppelte Lanes zu vermeiden.
  */
-export function getRoleFromName(name: string): string | undefined {
-  if (!name) return undefined;
-
-  // Also check if name is in format "[Role] Task Name" or "Role: Task Name"
-  const cleanName = name.toLowerCase();
-
-  for (const role of ROLES) {
-    if (role.patterns.some(pattern => pattern.test(cleanName))) {
-      return role.name;
-    }
-  }
-
-  return undefined;
+function getLeanIdentity(name: string): string {
+  return name
+      .replace(/<[^>]*>/g, '')      // Alle HTML Tags weg
+      .replace(/&nbsp;/g, ' ')     // HTML Leerzeichen zu Text Leerzeichen
+      .replace(/\s+/g, '')         // ALLE Leerzeichen weg für den Identitäts-Check
+      .toLowerCase()               // Case-insensitive
+      .trim();
 }
 
 /**
- * Verbessertes Ranking: Start/Ende nach oben, Unassigned in die Mitte,
- * bekannte Rollen nach deiner ROLES-Liste.
+ * Normalisiert einen Rollennamen für die Anzeige in der Lane-Beschriftung.
+ */
+function normalizeRoleName(name: string): string {
+  if (!name) return '';
+  return name
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+}
+
+/**
+ * Berechnet einen Rang für das Sortieren der Lanes.
  */
 export function getRoleRank(roleName: string | undefined): number {
-  if (!roleName || roleName === 'Unassigned') return 100; // Neutraler Startwert
-
-  const index = ROLES.findIndex(r => r.id === roleName.toLowerCase() || r.name === roleName);
-  if (index !== -1) return index;
-
-  // Fallback für dynamische Rollen: Alphabetisch nach dem 100er Block
-  return 200 + roleName.charCodeAt(0);
+  if (!roleName || roleName === 'Unassigned') return 999;
+  const identity = getLeanIdentity(roleName);
+  return 100 + (identity.charCodeAt(0) || 0);
 }
 
 /**
- * Tries to find a role in the name and returns the cleaned name (without role prefix) and the role name.
+ * Kernfunktion zur automatischen Extraktion von Rolle und Aufgabenname.
+ * Verhindert Duplikate durch strikte Identitätsprüfung.
  */
-export function extractRoleAndCleanName(name: string): { role?: string; cleanName: string } {
-  let role = getRoleFromName(name);
-  let cleanName = name;
+export function extractRoleAndCleanName(text: string): { role?: string; cleanName: string; roleIdentity?: string } {
+  if (!text) return { cleanName: '' };
 
-  // 1. Check for "[Role] Task Name" pattern
-  const bracketMatch = name.match(/^\[(.*?)\]\s*(.*)$/);
+  const cleanText = normalizeRoleName(text);
+  let role: string | undefined;
+  let taskName: string = cleanText;
+
+  // 1. Muster: [Rolle] Aufgabe
+  const bracketMatch = cleanText.match(/^\[(.*?)\]\s*(.*)$/);
   if (bracketMatch) {
-    const rawRole = bracketMatch[1].trim();
-    role = getRoleFromName(rawRole) || rawRole;
-    cleanName = bracketMatch[2].trim() || cleanName;
-    return { role, cleanName };
+    role = normalizeRoleName(bracketMatch[1]);
+    taskName = normalizeRoleName(bracketMatch[2]) || role;
   }
-
-  // 2. Check for "Role: Task Name" pattern
-  const colonMatch = name.match(/^([^:]+):\s*(.*)$/);
-  if (colonMatch) {
-    const rawRole = colonMatch[1].trim();
-    // Only accept it as a role if it's reasonably short (avoids taking whole sentences)
-    if (rawRole.length > 0 && rawRole.length < 35) {
-      role = getRoleFromName(rawRole) || rawRole;
-      cleanName = colonMatch[2].trim() || cleanName;
-      return { role, cleanName };
+  // 2. Muster: Rolle: Aufgabe
+  else {
+    const colonMatch = cleanText.match(/^([^:]{2,30}):\s*(.*)$/);
+    if (colonMatch) {
+      role = normalizeRoleName(colonMatch[1]);
+      taskName = normalizeRoleName(colonMatch[2]);
+    }
+    // 3. Muster: Rolle - Aufgabe
+    else {
+      const dashMatch = cleanText.match(/^([^-]{2,25})\s*-\s*(.*)$/);
+      if (dashMatch) {
+        role = normalizeRoleName(dashMatch[1]);
+        taskName = normalizeRoleName(dashMatch[2]);
+      }
     }
   }
 
-  // If no prefix pattern was found, return the fuzzy matched role (if any) and the original name
-  return { role, cleanName };
+  return {
+    role,
+    cleanName: taskName,
+    // Diese Identity sollte im Mapper als Key für die Map verwendet werden!
+    roleIdentity: role ? getLeanIdentity(role) : undefined
+  };
+}
+
+/**
+ * Validiert einen Rollennamen.
+ */
+export function getRoleFromName(name: string): string | undefined {
+  const normalized = normalizeRoleName(name);
+  return normalized.length > 0 ? normalized : undefined;
 }
