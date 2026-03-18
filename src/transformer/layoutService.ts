@@ -110,14 +110,10 @@ export async function computeElkLayout(
       'elk.layered.orthogonality': 'true',
       'elk.spacing.nodeNode': '80',
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-      'org.eclipse.elk.portConstraints': 'FIXED_SIDE', // Wichtig für die Ports
+      'org.eclipse.elk.portConstraints': 'FIXED_POS', // Wichtig für die Ports
     },
-    // ... innerhalb von computeElkLayout ...
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
-
-      // Prüfen, ob es ein Kreis-Element ist (Event)
-      const isEvent = node.type.includes('Event');
 
       // Bei Events (36x36) ist die Mitte 18. Bei Tasks (z.B. Höhe 80) ist sie 40.
       const halfHeight = size.shapeHeight / 2;
