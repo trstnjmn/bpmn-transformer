@@ -16,6 +16,9 @@ const ELEMENT_SIZES: Record<string, { width: number; height: number }> = {
 };
 
 const ELEMENT_COLORS: Record<string, { fill: string; stroke: string }> = {
+  'bpmn:StartEvent': { fill: '#ffffff', stroke: '#000000' },
+  'bpmn:EndEvent': { fill: '#ffffff', stroke: '#000000' },
+  'bpmn:IntermediateCatchEvent': { fill: '#ffffff', stroke: '#000000' },
   'bpmn:UserTask': { fill: '#fff9c4', stroke: '#fbc02d' },
   'bpmn:ServiceTask': { fill: '#e3f2fd', stroke: '#1e88e5' },
   'bpmn:BusinessRuleTask': { fill: '#e8f5e9', stroke: '#2e7d32' },
@@ -28,32 +31,6 @@ interface ElementSizeInfo {
   shapeWidth: number;
   shapeHeight: number;
   label?: { width: number; height: number };
-}
-
-/**
- * Hilfsfunktion: Berechnet den exakten Ankerpunkt am Rand eines Shapes.
- * Verhindert, dass Pfeile in Kreise (Events) oder Rauten (Gateways) hineinragen.
- */
-function getAnchorPoint(nodeType: string, shape: DiagramLayout, isSource: boolean) {
-  const x = shape.x || 0;
-  const y = shape.y || 0;
-  const w = shape.width || 0;
-
-  const TASK_MID = 40;
-  let yOffset = TASK_MID;
-
-  if (nodeType.includes('Event')) {
-    yOffset = 18; // Mitte von 36px
-  } else if (nodeType.includes('Gateway')) {
-    yOffset = 25; // Mitte von 50px
-  } else {
-    yOffset = (shape.height || 80) / 2;
-  }
-
-  return {
-    x: isSource ? x + w : x,
-    y: y + yOffset
-  };
 }
 
 function getElementSize(type: string, name?: string): ElementSizeInfo {
@@ -124,104 +101,106 @@ export async function computeElkLayout(
   );
   const validEdgeIds = new Set(edges.map(e => e.id));
 
-  const elkGraph = {
+  const elkGraph: any = {
     id: 'root',
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
+      'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.layered.orthogonality': 'true',
       'elk.spacing.nodeNode': '80',
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-      'elk.edgeRouting': 'ORTHOGONAL',
-      'elk.partitioning': 'true',
-      'elk.separateConnectedComponents': 'false',
-      'elk.alignment': 'TOP',
+      'org.eclipse.elk.portConstraints': 'FIXED_POS', // Wichtig für die Ports
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
+
+      // Bei Events (36x36) ist die Mitte 18. Bei Tasks (z.B. Höhe 80) ist sie 40.
+      const halfHeight = size.shapeHeight / 2;
+
       return {
         id: node.id,
-        width: size.width,
-        height: size.height,
+        width: size.shapeWidth,
+        height: size.shapeHeight,
+        ports: [
+          {
+            id: `${node.id}_in`,
+            x: 0,
+            y: halfHeight,
+            layoutOptions: { 'elk.port.side': 'WEST' }
+          },
+          {
+            id: `${node.id}_out`,
+            x: size.shapeWidth,
+            y: halfHeight,
+            layoutOptions: { 'elk.port.side': 'EAST' }
+          }
+        ],
         layoutOptions: {
-          'elk.partition': String(getRoleRank(node.role))
+          'elk.partition': String(getRoleRank(node.role)),
+          'org.eclipse.elk.portConstraints': 'FIXED_POS',
         }
       };
     }),
     edges: edges.map(edge => ({
       id: edge.id,
-      sources: [edge.sourceRef!],
-      targets: [edge.targetRef!],
+      sources: [`${edge.sourceRef}_out`],
+      targets: [`${edge.targetRef}_in`],
     })),
   };
 
   const laidOut = await elk.layout(elkGraph);
   const layout: DiagramLayout[] = [];
-  const X_OFFSET = 120; // Puffer für Lane-Labels
+  const X_OFFSET = 150; // Genug Platz für Lane-Labels links
+  const titleOffset = fileName ? 80 : 20;
 
-  // 1. Shapes (Nodes) mappen
+  // 1. Shapes mappen
   for (const child of laidOut.children ?? []) {
     const node = nodes.find(n => n.id === child.id);
-    const sizeInfo = getElementSize(node?.type ?? '', node?.name);
     const colors = node ? ELEMENT_COLORS[node.type] : undefined;
-
-    let finalYPos = Math.round(child.y ?? 0);
-
-    if (node?.type.includes('Event')) {
-      finalYPos += 22;
-    } else if (node?.type.includes('Gateway')) {
-      finalYPos += 15;
-    }
 
     layout.push({
       id: child.id + '_di',
       type: 'shape',
       bpmnElement: child.id,
-      x: Math.round((child.x ?? 0)) + X_OFFSET,
-      y: finalYPos, // Nutzt den korrigierten Wert
-      width: sizeInfo.shapeWidth,
-      height: sizeInfo.shapeHeight,
+      x: Math.round(child.x ?? 0) + X_OFFSET,
+      y: Math.round(child.y ?? 0) + titleOffset,
+      width: child.width,
+      height: child.height,
       fill: colors?.fill,
       stroke: colors?.stroke,
     });
   }
 
-  // 2. Edges mappen (mit Snapping-Hilfsfunktion)
+  // 2. Edges mappen
   for (const edge of (laidOut.edges ?? []) as any[]) {
-    const sourceNode = nodes.find(n => n.id === edge.sources[0]);
-    const targetNode = nodes.find(n => n.id === edge.targets[0]);
-
-    const sourceShape = layout.find(l => l.bpmnElement === edge.sources[0]);
-    const targetShape = layout.find(l => l.bpmnElement === edge.targets[0]);
-
-    if (!sourceShape || !targetShape) continue;
-
     const sections = edge.sections ?? [];
-    let waypoints = sections.flatMap((s: any) => [
-      { x: Math.round(s.startPoint.x + X_OFFSET), y: Math.round(s.startPoint.y) },
-      ...(s.bendPoints?.map((bp: any) => ({ x: Math.round(bp.x + X_OFFSET), y: Math.round(bp.y) })) || []),
-      { x: Math.round(s.endPoint.x + X_OFFSET), y: Math.round(s.endPoint.y) }
+
+    // ELK liefert durch die Ports bereits sehr saubere Start- und Endpunkte
+    const waypoints = sections.flatMap((s: any) => [
+      {
+        x: Math.round(s.startPoint.x + X_OFFSET),
+        y: Math.round(s.startPoint.y + titleOffset)
+      },
+      ...(s.bendPoints?.map((bp: any) => ({
+        x: Math.round(bp.x + X_OFFSET),
+        y: Math.round(bp.y + titleOffset)
+      })) || []),
+      {
+        x: Math.round(s.endPoint.x + X_OFFSET),
+        y: Math.round(s.endPoint.y + titleOffset)
+      }
     ]);
 
-    if (waypoints.length >= 2) {
-      waypoints[0] = getAnchorPoint(sourceNode!.type, sourceShape, true);
-      waypoints[waypoints.length - 1] = getAnchorPoint(targetNode!.type, targetShape, false);
-    }
-
-    layout.push({ id: edge.id + '_di', type: 'edge', bpmnElement: edge.id, waypoints });
-  }
-
-  // 3. Titel-Offset
-  const titleOffset = fileName ? 80 : 0;
-  if (titleOffset > 0) {
-    layout.forEach(item => {
-      item.y = (item.y || 0) + titleOffset;
-      if (item.type === 'edge' && item.waypoints) {
-        item.waypoints.forEach(wp => wp.y += titleOffset);
-      }
+    layout.push({
+      id: edge.id + '_di',
+      type: 'edge',
+      bpmnElement: edge.id,
+      waypoints
     });
   }
 
-  // 4. LANES GENERIEREN (Um die positionierten Elemente herum)
+  // 3. Lanes (Berechnung bleibt ähnlich, aber nutzt die neuen Offsets)
   if (lanes && lanes.length > 0) {
     const maxDiagramWidth = Math.max(...layout.map(i => (i.x || 0) + (i.width || 0)), 1000);
 
@@ -234,7 +213,7 @@ export async function computeElkLayout(
 
       const minY = Math.min(...laneContent.map(i => i.y || 0));
       const maxY = Math.max(...laneContent.map(i => (i.y || 0) + (i.height || 0)));
-      const padding = 20;
+      const padding = 30;
 
       layout.push({
         id: lane.id + '_di',

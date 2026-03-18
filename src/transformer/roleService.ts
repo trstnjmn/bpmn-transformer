@@ -57,19 +57,17 @@ export function getRoleFromName(name: string): string | undefined {
 }
 
 /**
- * Returns the rank (vertical order) of a role.
- * Lower number means higher position (top of diagram).
+ * Verbessertes Ranking: Start/Ende nach oben, Unassigned in die Mitte,
+ * bekannte Rollen nach deiner ROLES-Liste.
  */
 export function getRoleRank(roleName: string | undefined): number {
-  if (!roleName) return 1000; // Ganz weit unten
+  if (!roleName || roleName === 'Unassigned') return 100; // Neutraler Startwert
 
-  const index = ROLES.findIndex(r => r.name === roleName);
+  const index = ROLES.findIndex(r => r.id === roleName.toLowerCase() || r.name === roleName);
   if (index !== -1) return index;
 
-  // Für ganz neue Rollen: Gib einen Wert basierend auf dem Namen zurück,
-  // damit verschiedene neue Rollen nicht alle den gleichen Rank (ROLES.length) haben.
-  // So bekommt "Z-Rolle" einen höheren Rank als "A-Rolle".
-  return 500 + roleName.charCodeAt(0);
+  // Fallback für dynamische Rollen: Alphabetisch nach dem 100er Block
+  return 200 + roleName.charCodeAt(0);
 }
 
 /**

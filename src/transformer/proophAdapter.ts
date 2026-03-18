@@ -1,53 +1,41 @@
 import type { ConversionInput, ProcessElement, DiagramLayout, LaneDefinition } from './types';
 import { extractRoleAndCleanName, getRoleRank } from './roleService';
-import { wordWrap } from './utils';
+import { wordWrap, sanitizeId } from './utils';
 
-/**
- * Helper to get attributes from an object, handling both '@_prefix' and '@attributes' nesting.
- */
 function getAttrs(obj: any): any {
   if (!obj) return {};
   const attrs: any = {};
-
-  // 1. Check for nested @attributes
-  if (obj['@attributes']) {
-    Object.assign(attrs, obj['@attributes']);
-  }
-
-  // 2. Check for @_ prefixed properties and merge them
+  if (obj['@attributes']) Object.assign(attrs, obj['@attributes']);
   Object.keys(obj).forEach(key => {
-    if (key.startsWith('@_')) {
-      attrs[key.substring(2)] = obj[key];
-    } else if (key === 'id' || key === 'value' || key === 'style' || key === 'vertex' || key === 'edge' || key === 'source' || key === 'target' || key === 'parent') {
-      // Also accept direct properties if they are standard mxGraph attributes
+    if (key.startsWith('@_')) attrs[key.substring(2)] = obj[key];
+    else if (['id', 'value', 'style', 'vertex', 'edge', 'source', 'target', 'parent', 'label'].includes(key)) {
       attrs[key] = obj[key];
     }
   });
-
   return attrs;
 }
 
-/**
- * Maps Prooph Board mxGraph JSON to our internal ConversionInput format.
- */
 export function mapProophToConversionInput(proophData: any): ConversionInput {
   const root = proophData?.mxGraphModel?.root;
   if (!root) throw new Error('Invalid Prooph Board JSON: mxGraphModel.root is missing.');
 
   const elements: ProcessElement[] = [];
   const layout: DiagramLayout[] = [];
-
-  // 1. Collect ALL cells and metadata
   const allCells: any[] = [];
   const metadataMap = new Map<string, any>();
 
-  const processObject = (obj: any) => {
+  // 1. EXTRAKTION (rekursiv mit Label-Vererbung)
+  const processObject = (obj: any, parentLabel?: string) => {
     if (!obj || typeof obj !== 'object') return;
 
     const attrs = getAttrs(obj);
     const id = attrs.id;
 
     if (id) {
+      // Nutze parentLabel, falls das aktuelle Objekt kein eigenes hat
+      if (!attrs.label && parentLabel) {
+        attrs.label = parentLabel;
+      }
       metadataMap.set(id, attrs);
     }
 
@@ -55,204 +43,191 @@ export function mapProophToConversionInput(proophData: any): ConversionInput {
       const cells = Array.isArray(obj.mxCell) ? obj.mxCell : [obj.mxCell];
       cells.forEach((cell: any) => {
         const cellAttrs = getAttrs(cell);
-        if (!cellAttrs.id && id) {
-          cell['@_id'] = id;
-        }
+        if (!cellAttrs.id && id) cell['@_id'] = id;
         allCells.push(cell);
       });
     }
 
+    // Rekursion durch Kinder-Elemente
     Object.keys(obj).forEach(key => {
       if (key !== 'mxCell' && !key.startsWith('@')) {
         const val = obj[key];
-        if (Array.isArray(val)) {
-          val.forEach(item => processObject(item));
-        } else {
-          processObject(val);
-        }
+        // Reiche das aktuelle Label (oder das geerbte) nach unten weiter
+        const currentLabel = attrs.label || parentLabel;
+        if (Array.isArray(val)) val.forEach(item => processObject(item, currentLabel));
+        else processObject(val, currentLabel);
       }
     });
   };
 
   processObject(root);
 
-  // 2. Pre-calculate absolute positions
-  const cellMap = new Map<string, { attr: any, geometry: any, cell: any }>();
-  allCells.forEach(cell => {
-    const attr = getAttrs(cell);
-    if (attr.id) {
-      cellMap.set(attr.id, {
-        attr,
-        geometry: cell.mxGeometry ? getAttrs(cell.mxGeometry) : null,
-        cell
-      });
-    }
-  });
+  // Hilfsfunktion für absolute Positionierung
+  const cellMap = new Map<string, any>();
+  allCells.forEach(c => { const a = getAttrs(c); if (a.id) cellMap.set(a.id, { attr: a, cell: c }); });
 
   const getAbsolutePos = (id: string): { x: number, y: number } => {
     const entry = cellMap.get(id);
-    if (!entry || !entry.geometry) return { x: 0, y: 0 };
-
-    let x = parseInt(entry.geometry.x || '0');
-    let y = parseInt(entry.geometry.y || '0');
-
-    // Offset for labels/points if it's an edge, skip for now to avoid confusion
-    if (entry.attr.edge === '1') return { x: 0, y: 0 };
-
-    if (entry.attr.parent && entry.attr.parent !== '0' && entry.attr.parent !== '1') {
-      const parentPos = getAbsolutePos(entry.attr.parent);
-      x += parentPos.x;
-      y += parentPos.y;
+    if (!entry) return { x: 0, y: 0 };
+    const geo = entry.cell.mxGeometry ? getAttrs(entry.cell.mxGeometry) : {};
+    let x = parseInt(geo.x || '0'), y = parseInt(geo.y || '0');
+    if (entry.attr.parent && !['0', '1'].includes(entry.attr.parent)) {
+      const pPos = getAbsolutePos(entry.attr.parent);
+      x += pPos.x; y += pPos.y;
     }
-
     return { x, y };
   };
 
-  // 3. Map Cells to BPMN
-  const usedPositions = new Set<string>();
-
+  // 2. MAPPING der Knoten
   allCells.forEach((cell: any) => {
     const attr = getAttrs(cell);
     const id = attr.id;
-    const style = attr.style || '';
-    const geometry = cell.mxGeometry ? getAttrs(cell.mxGeometry) : null;
-    const meta = metadataMap.get(id);
-
     if (!id || id === '0' || id === '1') return;
 
     if (attr.vertex === '1' || attr.vertex === 1) {
+      const style = attr.style || '';
+      const meta = metadataMap.get(id);
+
+      // Label aufräumen
+      let rawLabel = (meta?.label || attr.value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim();
+
+      // Heuristik gegen IDs als Namen
+      if (rawLabel.length > 20 && !rawLabel.includes(' ')) rawLabel = '';
+
       let type: any = 'bpmn:Task';
-      let rawLabel = meta?.label || attr.value || '';
-      // Strip HTML tags and normalize spacing
-      rawLabel = rawLabel.replace(/<br\s*\/?>/gi, '\n');
-      rawLabel = rawLabel.replace(/<[^>]*>/g, ' ');
-      rawLabel = rawLabel.replace(/&nbsp;/g, ' ');
-      rawLabel = rawLabel.replace(/[ \t]+/g, ' ').trim();
+      if (style.includes('event')) type = 'bpmn:IntermediateCatchEvent';
+      else if (style.includes('command')) type = 'bpmn:UserTask';
+      else if (style.includes('policy')) type = 'bpmn:BusinessRuleTask';
+      else if (['boundedContext', 'feature', 'freeText', 'icon'].some(s => style.includes(s))) return;
 
-      let { role, cleanName } = extractRoleAndCleanName(rawLabel);
+      const { role, cleanName } = extractRoleAndCleanName(rawLabel || 'Task');
+      const { x, y } = getAbsolutePos(id);
+      const geo = cell.mxGeometry ? getAttrs(cell.mxGeometry) : {};
 
-      if (style.includes('event')) {
-        type = 'bpmn:IntermediateCatchEvent';
-      } else if (style.includes('command')) {
-        type = 'bpmn:UserTask';
-      } else if (style.includes('policy')) {
-        type = 'bpmn:BusinessRuleTask';
-      } else if (style.includes('boundedContext') || style.includes('feature') || style.includes('freeText') || style.includes('icon') || style.includes('image')) {
-        return;
-      }
-
-      let { x, y } = getAbsolutePos(id);
-      let width = parseInt(geometry?.width || '100');
-      let height = parseInt(geometry?.height || '80');
-
-      // Adjust sizes for BPMN standards if they seem generic
-      if (type === 'bpmn:IntermediateCatchEvent') {
-        width = 36;
-        height = 36;
-      }
-
-      // Simple overlap prevention: if exact position used, shift it
-      let posKey = `${x},${y}`;
-      let safetyCounter = 0;
-      while (usedPositions.has(posKey) && safetyCounter < 10) {
-        x += 20;
-        y += 20;
-        posKey = `${x},${y}`;
-        safetyCounter++;
-      }
-      usedPositions.add(posKey);
-
-      elements.push({
-        id,
-        type,
-        name: wordWrap(cleanName || id, 18),
-        role
-      });
-
+      elements.push({ id, type, name: wordWrap(cleanName, 20), role });
       layout.push({
-        id: id + '_di',
-        type: 'shape',
-        bpmnElement: id,
-        x, y, width, height
+        id: id + '_di', type: 'shape', bpmnElement: id,
+        x, y,
+        width: parseInt(geo.width || '100'),
+        height: parseInt(geo.height || '80')
       });
     }
 
     if ((attr.edge === '1' || attr.edge === 1) && attr.source && attr.target) {
-      elements.push({
-        id: id,
-        type: 'bpmn:SequenceFlow',
-        sourceRef: attr.source,
-        targetRef: attr.target
-      });
+      elements.push({ id, type: 'bpmn:SequenceFlow', sourceRef: attr.source, targetRef: attr.target });
+      layout.push({ id: id + '_di', type: 'edge', bpmnElement: id });
+    }
+  });
 
-      const waypoints: { x: number, y: number }[] = [];
-      const parentPos = attr.parent ? getAbsolutePos(attr.parent) : { x: 0, y: 0 };
+// 3. START/END HEURISTIK
+  const sourceIds = new Set(elements.filter(e => e.type === 'bpmn:SequenceFlow').map(e => e.sourceRef));
+  const targetIds = new Set(elements.filter(e => e.type === 'bpmn:SequenceFlow').map(e => e.targetRef));
 
-      const geoArray = cell.mxGeometry?.Array || cell.mxGeometry?.points;
-      if (geoArray?.mxPoint) {
-        const points = Array.isArray(geoArray.mxPoint) ? geoArray.mxPoint : [geoArray.mxPoint];
-        points.forEach((p: any) => {
-          const pAttr = getAttrs(p);
-          if (pAttr.x !== undefined && pAttr.y !== undefined) {
-            waypoints.push({
-              x: parseInt(pAttr.x) + parentPos.x,
-              y: parseInt(pAttr.y) + parentPos.y
-            });
-          }
+  const newEndEvents: ProcessElement[] = [];
+  const newEndLayouts: DiagramLayout[] = [];
+  const eventSize = 36; // Konstante für alle Kreise
+
+  [...elements].forEach(el => {
+    if (el.type === 'bpmn:SequenceFlow') return;
+
+    const hasInbound = targetIds.has(el.id);
+    const hasOutbound = sourceIds.has(el.id);
+
+    // 1. Korrektur bestehender Events (Start/End/Intermediate)
+    if (el.type === 'bpmn:IntermediateCatchEvent') {
+      if (!hasInbound) el.type = 'bpmn:StartEvent';
+      else if (!hasOutbound) el.type = 'bpmn:EndEvent';
+    }
+
+    // 2. Größen-Update für alle Kreise im bestehenden Layout
+    if (['bpmn:StartEvent', 'bpmn:EndEvent', 'bpmn:IntermediateCatchEvent'].includes(el.type)) {
+      const lItem = layout.find(l => l.bpmnElement === el.id);
+      if (lItem) {
+        // Wir zentrieren den Kreis nach der Größenänderung nach,
+        // damit er nicht nach oben links "hüpft"
+        const oldW = lItem.width ?? 100;
+        const oldH = lItem.height ?? 80;
+        lItem.x = (lItem.x ?? 0) + (oldW / 2) - (eventSize / 2);
+        lItem.y = (lItem.y ?? 0) + (oldH / 2) - (eventSize / 2);
+        lItem.width = eventSize;
+        lItem.height = eventSize;
+      }
+    }
+
+    // 3. Erstellung neuer Endpunkte für Tasks/ReadModels ohne Ausgang
+    if (!hasOutbound && el.type !== 'bpmn:EndEvent' && el.type !== 'bpmn:StartEvent') {
+      const endEventId = sanitizeId(`end_${el.id}`);
+      const currentLayout = layout.find(l => l.bpmnElement === el.id);
+
+      if (currentLayout) {
+        const lx = currentLayout.x ?? 0;
+        const ly = currentLayout.y ?? 0;
+        const lw = currentLayout.width ?? 100;
+        const lh = currentLayout.height ?? 80;
+
+        // HIER IST DIE FEINJUSTIERUNG
+        const xPos = lx + lw + 60; // Horizontaler Abstand
+        const yPos = ly + (lh / 2) - (eventSize / 2); // Vertikale Mitte der Box
+
+        newEndEvents.push({
+          id: endEventId,
+          type: 'bpmn:EndEvent',
+          name: '',
+          role: el.role
+        });
+
+        newEndLayouts.push({
+          id: endEventId + '_di',
+          type: 'shape',
+          bpmnElement: endEventId,
+          x: xPos,
+          y: yPos,
+          width: eventSize,
+          height: eventSize
+        });
+
+        const flowId = sanitizeId(`flow_to_end_${el.id}`);
+        newEndEvents.push({
+          id: flowId,
+          type: 'bpmn:SequenceFlow',
+          sourceRef: el.id,
+          targetRef: endEventId
+        });
+
+        newEndLayouts.push({
+          id: flowId + '_di',
+          type: 'edge',
+          bpmnElement: flowId,
+          waypoints: [
+            { x: lx + lw, y: ly + (lh / 2) },
+            { x: xPos, y: ly + (lh / 2) } // Punktlandung auf der Mittellinie
+          ]
         });
       }
-
-      layout.push({
-        id: id + '_di',
-        type: 'edge',
-        bpmnElement: id,
-        waypoints: waypoints.length > 0 ? waypoints : undefined
-      });
     }
   });
 
+  elements.push(...newEndEvents);
+  layout.push(...newEndLayouts);
 
-  // 4. Group into Lanes
+  // 4. LANES
   const lanes: LaneDefinition[] = [];
   const elementsByRole = new Map<string, string[]>();
-
-  // Wichtig: Wir brauchen eine Liste aller Rollen für ELK
-  elements.forEach(el => {
-    if (el.type !== 'bpmn:SequenceFlow') {
-      const roleName = el.role || 'Unassigned';
-      if (!elementsByRole.has(roleName)) {
-        elementsByRole.set(roleName, []);
-      }
-      elementsByRole.get(roleName)!.push(el.id);
-    }
+  elements.filter(e => e.type !== 'bpmn:SequenceFlow').forEach(el => {
+    const r = el.role || 'Unassigned';
+    if (!elementsByRole.has(r)) elementsByRole.set(r, []);
+    elementsByRole.get(r)!.push(el.id);
   });
 
-  // Rollen sortieren (wichtig für die vertikale Abfolge im Diagramm)
-  const sortedRoles = Array.from(elementsByRole.keys()).sort((a, b) => {
-    const rankA = getRoleRank(a);
-    const rankB = getRoleRank(b);
-    if (rankA !== rankB) return rankA - rankB;
-    return a.localeCompare(b);
-  });
+  Array.from(elementsByRole.keys())
+      .sort((a, b) => getRoleRank(a) - getRoleRank(b))
+      .forEach(roleName => {
+        lanes.push({
+          id: sanitizeId(`Lane_${roleName}`),
+          name: roleName,
+          elementIds: elementsByRole.get(roleName) || []
+        });
+      });
 
-  sortedRoles.forEach(roleName => {
-    lanes.push({
-      // ID bereinigen, damit sie BPMN-konform ist (keine Leerzeichen)
-      id: `Lane_${roleName.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      name: roleName,
-      elementIds: elementsByRole.get(roleName) || []
-    });
-  });
-
-  return {
-    process: {
-      id: 'ProophProcess',
-      name: 'Imported from Prooph Board',
-      elements: elements,
-      lanes: lanes
-    },
-    // Hinweis: Dieses Layout wird von computeElkLayout überschrieben,
-    // dient aber als Fallback, falls kein Auto-Layout gewünscht ist.
-    layout: layout
-  };
+  return { process: { id: 'ProophProcess', name: 'Imported Process', elements, lanes }, layout };
 }
