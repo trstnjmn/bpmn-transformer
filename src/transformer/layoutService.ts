@@ -16,20 +16,13 @@ const ELEMENT_SIZES: Record<string, { width: number; height: number }> = {
 };
 
 const ELEMENT_COLORS: Record<string, { fill: string; stroke: string }> = {
-  // Tasks
-  'bpmn:UserTask': { fill: '#fff9c4', stroke: '#fbc02d' },          // Gelb
-  'bpmn:ServiceTask': { fill: '#e3f2fd', stroke: '#1e88e5' },       // Blau
-  'bpmn:BusinessRuleTask': { fill: '#e8f5e9', stroke: '#2e7d32' },  // Grün
-  'bpmn:ManualTask': { fill: '#fbe9e7', stroke: '#ff5722' },        // Orange (Manuell)
-  'bpmn:Task': { fill: '#f5f5f5', stroke: '#757575' },              // Grau (Neutral)
-
-  // Events (Sehr hilfreich für die Orientierung)
-  'bpmn:StartEvent': { fill: '#e8f5e9', stroke: '#4caf50' },        // Hellgrün
-  'bpmn:EndEvent': { fill: '#ffebee', stroke: '#e91e63' },          // Sanftes Rot
-  'bpmn:IntermediateCatchEvent': { fill: '#fff3e0', stroke: '#ff9800' }, // Orange
-
-  // Gateways (Logik-Knoten)
-  'bpmn:ExclusiveGateway': { fill: '#f3e5f5', stroke: '#9c27b0' },  // Lila
+  'bpmn:StartEvent': { fill: '#ffffff', stroke: '#000000' },
+  'bpmn:EndEvent': { fill: '#ffffff', stroke: '#000000' },
+  'bpmn:IntermediateCatchEvent': { fill: '#ffffff', stroke: '#000000' },
+  'bpmn:UserTask': { fill: '#fff9c4', stroke: '#fbc02d' },
+  'bpmn:ServiceTask': { fill: '#e3f2fd', stroke: '#1e88e5' },
+  'bpmn:BusinessRuleTask': { fill: '#e8f5e9', stroke: '#2e7d32' },
+  'bpmn:Task': { fill: '#f5f5f5', stroke: '#757575' },
 };
 
 interface ElementSizeInfo {
