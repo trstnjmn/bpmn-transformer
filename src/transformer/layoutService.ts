@@ -108,9 +108,21 @@ export async function computeElkLayout(
       'elk.direction': 'RIGHT',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.layered.orthogonality': 'true',
-      'elk.spacing.nodeNode': '80',
+
+      // Vertikaler Platz für weniger Gedränge
+      'elk.spacing.nodeNode': '150',
       'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-      'org.eclipse.elk.portConstraints': 'FIXED_POS', // Wichtig für die Ports
+
+      // NEU: Kanten-Optimierung
+      'elk.layered.mergeEdges': 'true',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '60',
+      'elk.layered.spacing.edgeEdgeBetweenLayers': '40',
+      'elk.layered.unnecessaryBendpoints': 'true',
+
+      // Alignment für horizontale Pfade
+      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
+
+      'org.eclipse.elk.portConstraints': 'FIXED_POS',
     },
     children: nodes.map(node => {
       const size = getElementSize(node.type, node.name);
@@ -200,11 +212,16 @@ export async function computeElkLayout(
     });
   }
 
-  // 3. Lanes (Berechnung bleibt ähnlich, aber nutzt die neuen Offsets)
+// 3. Lanes (Dynamische Höhenberechnung)
   if (lanes && lanes.length > 0) {
+    const verticalPadding = 40;
+    const horizontalPadding = 40;
+
     const maxDiagramWidth = Math.max(...layout.map(i => (i.x || 0) + (i.width || 0)), 1000);
 
-    lanes.forEach(lane => {
+    const sortedLanes = [...lanes].sort((a, b) => getRoleRank(a.name) - getRoleRank(b.name));
+
+    sortedLanes.forEach(lane => {
       const laneContent = layout.filter(item =>
           item.type === 'shape' && lane.elementIds.includes(item.bpmnElement)
       );
@@ -213,16 +230,17 @@ export async function computeElkLayout(
 
       const minY = Math.min(...laneContent.map(i => i.y || 0));
       const maxY = Math.max(...laneContent.map(i => (i.y || 0) + (i.height || 0)));
-      const padding = 30;
+
+      const laneHeight = (maxY - minY) + (verticalPadding * 2);
 
       layout.push({
         id: lane.id + '_di',
         type: 'shape',
         bpmnElement: lane.id,
         x: 10,
-        y: minY - padding,
-        width: maxDiagramWidth + padding - 10,
-        height: (maxY - minY) + (padding * 2)
+        y: minY - verticalPadding,
+        width: maxDiagramWidth + horizontalPadding,
+        height: laneHeight
       });
     });
   }
